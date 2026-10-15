@@ -42,6 +42,20 @@ function redactDeep(value: unknown, key = ""): unknown {
   return value;
 }
 
+function formatLocalTimestamp(value: string | number | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const pick = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const ms = String(date.getMilliseconds()).padStart(3, "0");
+  return `${pick("year")}-${pick("month")}-${pick("day")} ${pick("hour")}:${pick("minute")}:${pick("second")}.${ms} WIB (UTC+07:00)`;
+}
+
 function getEventType(event: AnyRecord): string {
   return typeof event?.type === "string" ? event.type : "unknown";
 }
@@ -179,7 +193,7 @@ function buildReport(input: {
   const chronology = buildChronology(rawLines);
   const chronologyMarkdown = chronology.length
     ? chronology.map((c, i) =>
-        `| ${i + 1} | ${c.time} | ${roleLabel(c.role)} | ${c.text.replace(/\|/g, "\\|").replace(/\n/g, "<br>")} |`).join("\n")
+        `| ${i + 1} | ${formatLocalTimestamp(c.time)} | ${roleLabel(c.role)} | ${c.text.replace(/\|/g, "\\|").replace(/\n/g, "<br>")} |`).join("\n")
     : "| - | - | - | Belum ada prompt/respons terekam. |";
 
   const modelLine = [...new Set(models.filter(Boolean))].join(", ") || "[Isi manual: model tidak tersedia di event]";
@@ -192,7 +206,7 @@ function buildReport(input: {
 ## Metadata
 
 - Log ID: \`AI-LOG-${memberId}-${sessionId}\`
-- Tanggal/waktu: ${new Date().toISOString()}
+- Tanggal/waktu: ${formatLocalTimestamp(new Date().toISOString())}
 - Anggota: ${memberId}
 - Agent/tool: Kilo
 - Model (jika tersedia): ${modelLine}
@@ -262,7 +276,7 @@ const MiniTransformerLogger: Plugin = async ({ directory }) => {
     };
     await appendFile(join(rawDirectory, `${sessionId}.jsonl`), `${JSON.stringify(row)}\n`, "utf8");
 
-    if (type === "session.idle") {
+    async function writeReport(): Promise<void> {
       const reportsDir = join(root, "docs", "ai-logs", "reports");
       await mkdir(reportsDir, { recursive: true });
       const reportPath = join(reportsDir, `AI-LOG-${memberId}-${sessionId}.md`);
@@ -288,6 +302,10 @@ const MiniTransformerLogger: Plugin = async ({ directory }) => {
       }
       const report = buildReport({ memberId, sessionId, rawPath, rawLines, models });
       await writeFile(reportPath, report, "utf8");
+    }
+
+    if (type === "message.updated" || type === "session.idle") {
+      await writeReport();
     }
   }
 
