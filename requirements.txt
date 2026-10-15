@@ -1,0 +1,8 @@
+# Install PyTorch using the official selector for your operating system and hardware:
+# https://pytorch.org/get-started/locally/
+# Then install the project dependencies below.
+pytest
+numpy
+matplotlib
+huggingface_hub
+datasets
