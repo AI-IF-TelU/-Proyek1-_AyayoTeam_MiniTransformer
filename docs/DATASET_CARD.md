@@ -17,10 +17,11 @@ Repositori mencantumkan lisensi CC BY-NC 4.0. Label kategori dilaporkan dibuat d
 ## Preprocessing
 1. Periksa kolom dan split yang benar-benar tersedia.
 2. Hapus baris dengan konten kosong.
-3. Normalisasi seperlunya; jangan menghapus tanda baca yang berguna untuk bahasa.
-4. Deduplicasi berdasarkan konten yang telah dinormalisasi.
-5. Pisahkan data berdasarkan dokumen sebelum membuat window token.
-6. Bangun vocabulary hanya dari training split.
+3. Normalisasi seperlunya: ubah huruf ke lowercase (sesuai kontrak tokenizer TECH_SPEC §3); jangan menghapus tanda baca yang berguna untuk bahasa.
+4. Deduplikasi berdasarkan konten yang telah dinormalisasi.
+5. Pisahkan data berdasarkan dokumen sebelum tokenisasi dan pembuatan window. Strategi: pertahankan split bawaan dataset jika tersedia dan terverifikasi; jika tidak, fallback 80/10/10 dengan seed 42 (lihat ADR-010). Dilarang me-resplit test split bawaan secara sembarangan.
+6. Tokenisasi tiap dokumen, sisipkan `bos_id`/`eos_id` setelah tokenisasi, lalu bangun window sliding 65 stride 1 (kontrak detail: TECH_SPEC §4).
+7. Bangun vocabulary hanya dari training split.
 
 ## Keterbatasan dan risiko
 - Berita dapat berisi informasi yang sudah usang atau tidak lagi akurat.
@@ -29,6 +30,7 @@ Repositori mencantumkan lisensi CC BY-NC 4.0. Label kategori dilaporkan dibuat d
 - Hasil generation hanya demonstrasi pendidikan, bukan sumber berita tepercaya.
 
 ## Catatan eksperimen yang harus diisi
+> Diisi pada langkah dataset (setelah dataset diunduh dan diproses, bukan pada Issue #1).
 - Tanggal akses:
 - Versi/revision dataset:
 - Split asli dan jumlah baris:

@@ -20,7 +20,7 @@ These files are the source of truth. If there is a conflict, do not guess: repor
 - Prefer small changes that can be tested independently.
 - Add or update tests for every behavior change.
 - Do not claim a test passed unless you actually ran it and observed the output.
-- Do not merge directly to `main`; use a branch and pull request.
+- The repository default branch is `master`. Do not merge directly to `master`; use a feature branch and pull request.
 - Preserve meaningful AI interaction logs under `docs/ai-logs/`; never delete or fabricate logs.
 - Never write secrets, API keys, access tokens, passwords, or personal sensitive data to logs or Git.
 

@@ -1,48 +1,72 @@
-# Mini-Transformer Starter Kit
+# Mini-Transformer Project
 
-Starter repository for the Mini-GPT group project. This kit contains the initial project contracts and a **first-pass Kilo Code event logger**. It deliberately does not implement the Transformer model yet.
+Proyek kelompok: Mini-GPT kecil (decoder-only transformer) untuk next-token prediction pada teks berita bahasa Indonesia, diimplementasikan manual dari nol dengan Python + PyTorch.
 
-## First-use sequence (Windows + VS Code + Kilo Code)
+Kontrak teknis dan keputusan arsitektur dikunci melalui [Issue #1](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/1) — `[STEP 2] Lock Mini-Transformer Technical Specification and Architecture Decisions`. Sumber kebenaran: `AGENTS.md` dan enam dokumen inti di `docs/`.
 
-1. Extract this folder to a location without spaces if practical, e.g. `C:\Projects\mini-transformer`.
-2. Open that folder in VS Code (`File → Open Folder`).
-3. Create `.kilo/member.local.json` by copying `.kilo/member.local.example.json`, then set your unique member ID, e.g. `member-01`. This local file is ignored by Git.
-4. Ensure Kilo Code is installed and open its panel for this workspace.
-5. Start a new Kilo session with the smoke-test prompt below.
-6. Check whether files appear under `docs/ai-logs/raw/<member-id>/`.
-7. Confirm the raw JSONL contains the unique prompt text and the visible assistant response. If it does not, stop and debug logging before using Kilo for project code.
+## Status proyek
 
-## Logging smoke-test prompt
+- Spesifikasi & ADR: baseline final untuk Issue #1 — lihat `docs/TECH_SPEC.md` dan `docs/ARCHITECTURE_DECISIONS.md`.
+- Implementasi model: belum dimulai. Direktori `src/`, `tests/`, `outputs/`, `scripts/` hanya berisi placeholder.
+- Logging AI: plugin aktif; smoke test terverifikasi untuk satu anggota (lihat bagian Logging).
+
+## Struktur proyek (target)
+
+| Path | Isi (kontrak) |
+|---|---|
+| `src/data/` | `tokenizer.py`, `dataset.py` |
+| `src/model/` | `positional_encoding.py`, `attention.py`, `decoder_block.py`, `minigpt.py` |
+| `src/train.py` | training loop (loss, optimizer, logging metrics) |
+| `src/generate.py` | greedy generation |
+| `tests/` | unit test per modul |
+| `outputs/metrics/` | catatan train/val loss |
+| `docs/` | PRD, TECH_SPEC, ADR, dataset card, aturan AI, template log AI |
+| `docs/ai-logs/` | raw JSONL + laporan Markdown interaksi AI |
+| `scripts/ai_logging/` | placeholder tooling pendukung logging |
+
+Struktur di atas adalah target berdasar kontrak modul. Keberadaan direktori tidak berarti fitur sudah selesai.
+
+## Branch utama dan alur kerja
+
+- Branch utama repository: **`master`**. Jangan mengubah nama branch atau pengaturan repository GitHub tanpa persetujuan.
+- Satu GitHub Issue per unit kerja. Kerjakan pada feature branch:
+
+```powershell
+git checkout -b issue-<nomor>-<slug>
+```
+
+- Setelah selesai, buka Pull Request ke `master`. Tulis pesan commit ringkas sesuai gaya repo.
+- Review oleh anggota selain pembuat; tes wajib lulus sebelum merge. Jangan merge langsung ke `master`.
+- Jangan menandai Issue Done sebelum acceptance criteria terpenuhi.
+
+## Setup
+
+1. Python 3.x + PyTorch (instal via selector resmi pytorch.org), lalu dependensi pada `requirements.txt`.
+2. Salin `.kilo/member.local.example copy.json` menjadi `.kilo/member.local.json`, isi `member_id` unik Anda (file ini di-ignore Git).
+3. Jalankan smoke test logging di bawah sebelum mulai coding.
+
+## Logging AI
+
+Plugin `.kilo/plugin/mini-transformer-logger.ts` merekam event sesi Kilo:
+
+- Raw: `docs/ai-logs/raw/<member-id>/<session-id>.jsonl`
+- Laporan: `docs/ai-logs/reports/AI-LOG-<member-id>-<session-id>.md`
+
+Redaction aktif untuk API key, token, password. Jangan menulis data sensitif ke log.
+
+### Smoke-test prompt
 
 > LOGGING SMOKE TEST. Do not edit any files or run commands. Reply exactly: `LOGGER-TEST-2026-01` and explain that this is only a test. This prompt and your response must be recorded by the project logger.
 
-After that session, inspect:
+Setelah sesi, periksa raw JSONL berisi teks prompt dan respons Anda.
 
-- `docs/ai-logs/raw/<member-id>/<session-id>.jsonl`
-- `docs/ai-logs/reports/AI-LOG-<member-id>-<session-id>.md`
+### Status verifikasi logging
 
-The local plugin listens to Kilo events and writes sanitized event payloads. Kilo's event shapes can change, so this starter logger is **not accepted as operational until the smoke test confirms prompt and response capture in your installed version**.
+- Bukti tersedia untuk anggota `raihanfahrifi-80017`: dua sesi terekam (62 dan 1174 baris event), prompt dan respons tertangkap.
+- Bahwa satu anggota lolos **tidak** berarti semua lolos: setiap anggota wajib menjalankan smoke test pada instalasi/versi Kilo masing-masing dan mengonfirmasi capture sebelum coding.
 
-## Git setup
+## Aturan proyek
 
-Open a terminal in this folder and run:
-
-```powershell
-git init
-git add .
-git commit -m "chore: bootstrap mini-transformer project"
-```
-
-Create an empty GitHub repository named `mini-transformer`, then connect it using the repository URL shown by GitHub:
-
-```powershell
-git branch -M main
-git remote add origin https://github.com/<YOUR-ORG-OR-USERNAME>/mini-transformer.git
-git push -u origin main
-```
-
-If the GitHub repository already has a README or license commit, do not blindly overwrite it. Tell the project coordinator so we can reconcile the histories safely.
-
-## Current project rule
-
-Do not begin model implementation until the team has approved the six documents in `docs/` and the Kilo logging smoke test succeeds.
+- Ikuti `AGENTS.md` dan enam dokumen inti `docs/`.
+- Jangan mulai implementasi model sebelum Issue #1 selesai dan smoke test logging Anda lulus.
+- Jangan mengubah keputusan arsitektur tanpa mencatatnya di `docs/ARCHITECTURE_DECISIONS.md` dan memperoleh persetujuan tim.
