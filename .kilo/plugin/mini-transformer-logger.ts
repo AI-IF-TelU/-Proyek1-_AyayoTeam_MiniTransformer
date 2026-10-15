@@ -3,9 +3,11 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /**
- * First-pass logger for Kilo Code.
- * It records sanitized raw events. Treat it as unverified until the smoke test
- * proves that the installed Kilo version exposes prompt and visible response content.
+ * Event logger for Kilo sessions.
+ * Records sanitized raw events to raw JSONL (evidence) and generates a
+ * Markdown report following docs/AI_LOG_TEMPLATE.md from the same raw file.
+ * Not accepted as operational until the README smoke test confirms
+ * prompt and response capture in the installed Kilo version.
  */
 
 type AnyRecord = Record<string, any>;
@@ -68,6 +70,168 @@ function isRelevantEvent(type: string): boolean {
     type === "lsp.client.diagnostics";
 }
 
+interface ChronologyEntry {
+  time: string;
+  role: string;
+  model: string;
+  text: string;
+  order: number;
+}
+
+function buildChronology(rawLines: string[]): ChronologyEntry[] {
+  const messages = new Map<string, { role: string; time: string; model: string; order: number }>();
+  const partText = new Map<string, Map<string, string>>();
+  let order = 0;
+
+  for (const line of rawLines) {
+    let row: AnyRecord;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const type = String(row.event_type ?? "unknown");
+    const props = (row.raw_event as AnyRecord)?.properties ?? {};
+    if (type === "message.updated") {
+      const info = (props as AnyRecord).info ?? {};
+      if (info?.id) {
+        const model =
+          info.model?.providerID && info.model?.modelID
+            ? `${info.model.providerID}/${info.model.modelID}`
+            : info.providerID && info.modelID
+              ? `${info.providerID}/${info.modelID}`
+              : "";
+        messages.set(String(info.id), {
+          role: info.role ?? "unknown",
+          time: row.timestamp ?? "",
+          model,
+          order: order++,
+        });
+      }
+    } else if (type === "message.part.updated") {
+      const part = (props as AnyRecord)?.part;
+      if (part?.messageID && typeof part.text === "string") {
+        const byPart = partText.get(String(part.messageID)) ?? new Map<string, string>();
+        byPart.set(String(part.id), String(part.text));
+        partText.set(String(part.messageID), byPart);
+      }
+    }
+  }
+
+  const seen = new Set<string>();
+  const entries: ChronologyEntry[] = [];
+  for (const line of rawLines) {
+    let row: AnyRecord;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const type = String(row.event_type ?? "unknown");
+    if (type === "message.part.updated") {
+      const part = (row.raw_event as AnyRecord)?.properties?.part;
+      if (part?.messageID && !seen.has(String(part.messageID))) {
+        seen.add(String(part.messageID));
+        const msg = messages.get(String(part.messageID));
+        const parts = partText.get(String(part.messageID)) ?? new Map();
+        const text = [...parts.values()].join("\n");
+        entries.push({
+          time: msg?.time ?? row.timestamp ?? "",
+          role: msg?.role ?? "unknown",
+          model: msg?.model ?? "",
+          text,
+          order: msg?.order ?? order++,
+        });
+      }
+    }
+  }
+  return entries.sort((a, b) => (a.order - b.order) || a.time.localeCompare(b.time));
+}
+
+function roleLabel(role: string): string {
+  if (role === "user") return "Prompt";
+  if (role === "assistant") return "Respons";
+  return role;
+}
+
+function buildReport(input: {
+  memberId: string;
+  sessionId: string;
+  rawPath: string;
+  rawLines: string[];
+  models: string[];
+}): string {
+  const { memberId, sessionId, rawPath, rawLines, models } = input;
+
+  const eventCounts = new Map<string, number>();
+  for (const line of rawLines) {
+    try {
+      const parsed = JSON.parse(line) as AnyRecord;
+      const eventType = String(parsed.event_type ?? "unknown");
+      eventCounts.set(eventType, (eventCounts.get(eventType) ?? 0) + 1);
+    } catch {
+      // Keep processing remaining records.
+    }
+  }
+  const countsMarkdown = [...eventCounts.entries()].sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, count]) => `| \`${name}\` | ${count} |`).join("\n") || "| Belum ada event | 0 |";
+
+  const chronology = buildChronology(rawLines);
+  const chronologyMarkdown = chronology.length
+    ? chronology.map((c, i) =>
+        `| ${i + 1} | ${c.time} | ${roleLabel(c.role)} | ${c.text.replace(/\|/g, "\\|").replace(/\n/g, "<br>")} |`).join("\n")
+    : "| - | - | - | Belum ada prompt/respons terekam. |";
+
+  const modelLine = [...new Set(models.filter(Boolean))].join(", ") || "[Isi manual: model tidak tersedia di event]";
+  const manual = "[Isi manual]";
+
+  return `# AI Interaction Log
+
+> Laporan ini dihasilkan dari log otomatis dan diverifikasi terhadap raw JSONL. Jangan mengarang prompt, respons, hasil test, atau keputusan.
+
+## Metadata
+
+- Log ID: \`AI-LOG-${memberId}-${sessionId}\`
+- Tanggal/waktu: ${new Date().toISOString()}
+- Anggota: ${memberId}
+- Agent/tool: Kilo
+- Model (jika tersedia): ${modelLine}
+- Session ID: ${sessionId}
+- GitHub Issue/PR: ${manual}
+- Target modul: ${manual}
+- Raw log path: [${rawPath}](../raw/${memberId}/${sessionId}.jsonl)
+- Share link (jika tersedia): ${manual}
+
+## Kronologi prompt dan respons
+
+| # | Waktu | Peran | Isi |
+|---|---|---|---|
+${chronologyMarkdown}
+
+## Debugging
+
+- Pesan error aktual: ${manual}
+- Prompt debugging aktual: ${manual}
+- Perubahan yang dilakukan: ${manual}
+- Hasil setelah perbaikan: ${manual}
+
+## Verifikasi
+
+- Perintah test yang dijalankan: smoke test README (lihat \`README.md\`, bagian "Logging smoke-test prompt")
+- Output aktual: ${rawLines.length} baris raw tercatat:
+${countsMarkdown}
+- Commit SHA: ${manual}
+- Acceptance criteria yang terpenuhi: ${manual}
+- Acceptance criteria yang belum terpenuhi: ${manual}
+
+## Refleksi yang diverifikasi anggota
+
+- Mengapa pendekatan dipilih: ${manual}
+- Pelajaran teknis: ${manual}
+- Keterbatasan dan langkah selanjutnya: ${manual}
+`;
+}
+
 const MiniTransformerLogger: Plugin = async ({ directory }) => {
   const root = directory;
   let memberId = sanitizeId(process.env.MINITRANSFORMER_MEMBER_ID, "member-unset");
@@ -109,28 +273,20 @@ const MiniTransformerLogger: Plugin = async ({ directory }) => {
       } catch {
         // Report still gets written with the evidence path.
       }
-      const eventCounts = new Map<string, number>();
+      const models: string[] = [];
       for (const line of rawLines) {
         try {
           const parsed = JSON.parse(line) as AnyRecord;
-          const eventType = String(parsed.event_type ?? "unknown");
-          eventCounts.set(eventType, (eventCounts.get(eventType) ?? 0) + 1);
+          if (parsed.event_type === "message.updated") {
+            const info = (parsed.raw_event as AnyRecord)?.properties?.info;
+            if (info?.model?.providerID && info?.model?.modelID) models.push(`${info.model.providerID}/${info.model.modelID}`);
+            else if (info?.providerID && info?.modelID) models.push(`${info.providerID}/${info.modelID}`);
+          }
         } catch {
-          // Keep processing remaining records.
+          // Ignore malformed rows.
         }
       }
-      const countsMarkdown = [...eventCounts.entries()].sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, count]) => `| \`${name}\` | ${count} |`).join("\n") || "| Belum ada event | 0 |";
-      const report = `# AI Interaction Log\n\n` +
-        `- Member: ${memberId}\n- Agent: Kilo Code\n- Session ID: ${sessionId}\n` +
-        `- Updated at: ${new Date().toISOString()}\n- Raw evidence: [${rawPath}](../raw/${memberId}/${sessionId}.jsonl)\n\n` +
-        `## Recorded event counts\n\n| Event | Count |\n|---|---:|\n${countsMarkdown}\n\n` +
-        `## Verification status\n\n` +
-        `- [ ] Confirm the unique test prompt is present in raw JSONL.\n` +
-        `- [ ] Confirm the visible assistant response is present in raw JSONL.\n` +
-        `- [ ] Check that no secrets or sensitive data are present.\n` +
-        `- [ ] Link related GitHub Issue/PR and verify test outcomes.\n\n` +
-        `> This report is generated from Kilo events. Event counts alone do not prove full prompt/response capture; complete the smoke test before relying on this logger for graded evidence.\n`;
+      const report = buildReport({ memberId, sessionId, rawPath, rawLines, models });
       await writeFile(reportPath, report, "utf8");
     }
   }

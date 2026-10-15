@@ -17,6 +17,9 @@ outputs/checkpoints/
 *.pth
 *.ckpt
 
+# Node/logger dependencies
+node_modules/
+
 # Local Kilo member identity
 .kilo/member.local.json
 

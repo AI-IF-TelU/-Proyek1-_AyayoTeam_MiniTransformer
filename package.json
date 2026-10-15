@@ -1,0 +1,28 @@
+{
+  "name": "ayayoteam_minitransformer",
+  "version": "1.0.0",
+  "description": "Starter repository for the Mini-GPT group project. This kit contains the initial project contracts and a **first-pass Kilo Code event logger**. It deliberately does not implement the Transformer model yet.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues"
+  },
+  "homepage": "https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer#readme",
+  "dependencies": {
+    "@kilocode/plugin": "^7.8.12"
+  }
+}
