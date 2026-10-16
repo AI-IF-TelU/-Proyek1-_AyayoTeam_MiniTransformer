@@ -7,16 +7,6 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
-# Training artifacts and downloaded data (do not commit large files)
-data/raw/*
-data/processed/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-outputs/checkpoints/
-*.pt
-*.pth
-*.ckpt
-
 # Node/logger dependencies
 node_modules/
 
