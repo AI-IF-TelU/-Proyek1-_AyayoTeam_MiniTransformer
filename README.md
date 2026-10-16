@@ -1,72 +1,232 @@
-# Mini-Transformer Project
+# Mini-Transformer — Mini-GPT Bahasa Indonesia
 
-Proyek kelompok: Mini-GPT kecil (decoder-only transformer) untuk next-token prediction pada teks berita bahasa Indonesia, diimplementasikan manual dari nol dengan Python + PyTorch.
+Implementasi model bahasa generatif kecil menggunakan arsitektur **Decoder-only Transformer** dengan Python dan PyTorch. Model dilatih dari nol untuk memprediksi token berikutnya berdasarkan korpus berita bahasa Indonesia.
 
-Kontrak teknis dan keputusan arsitektur dikunci melalui [Issue #1](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/1) — `[STEP 2] Lock Mini-Transformer Technical Specification and Architecture Decisions`. Sumber kebenaran: `AGENTS.md` dan enam dokumen inti di `docs/`.
+## 1. Tujuan Proyek
 
-## Status proyek
+- Mengimplementasikan Causal Multi-Head Self-Attention dan Sinusoidal Positional Encoding secara manual.
+- Melatih model untuk melakukan prediksi token berikutnya dan menghasilkan kelanjutan teks.
+- Memahami algoritma, kompleksitas, pengujian, serta proses pengembangan menggunakan Vibe Coding.
+- Merekam interaksi AI secara otomatis sebagai dokumentasi proyek.
 
-- Spesifikasi & ADR: baseline final untuk Issue #1 — lihat `docs/TECH_SPEC.md` dan `docs/ARCHITECTURE_DECISIONS.md`.
-- Implementasi model: belum dimulai. Direktori `src/`, `tests/`, `outputs/`, `scripts/` hanya berisi placeholder.
-- Logging AI: plugin aktif; smoke test terverifikasi untuk satu anggota (lihat bagian Logging).
+**Batasan:** Tidak menggunakan model pretrained GPT atau API GPT sebagai model utama. Komponen inti Transformer tidak boleh digantikan oleh `nn.Transformer` atau `nn.MultiheadAttention`.
 
-## Struktur proyek (target)
+## 2. Teknologi dan Dataset
 
-| Path | Isi (kontrak) |
-|---|---|
-| `src/data/` | `tokenizer.py`, `dataset.py` |
-| `src/model/` | `positional_encoding.py`, `attention.py`, `decoder_block.py`, `minigpt.py` |
-| `src/train.py` | training loop (loss, optimizer, logging metrics) |
-| `src/generate.py` | greedy generation |
-| `tests/` | unit test per modul |
-| `outputs/metrics/` | catatan train/val loss |
-| `docs/` | PRD, TECH_SPEC, ADR, dataset card, aturan AI, template log AI |
-| `docs/ai-logs/` | raw JSONL + laporan Markdown interaksi AI |
-| `scripts/ai_logging/` | placeholder tooling pendukung logging |
+- Python dan PyTorch.
+- VS Code dan Kilo Code.
+- Git dan GitHub.
+- Dataset: [Indonesian News Datasets](https://huggingface.co/datasets/fahadh4ilyas/indonesian_news_datasets).
 
-Struktur di atas adalah target berdasar kontrak modul. Keberadaan direktori tidak berarti fitur sudah selesai.
+Dataset awal menggunakan subset 500–2.000 artikel. Pemrosesan, split berdasarkan dokumen, tokenizer, dan pembentukan data training mengikuti [`docs/DATASET_CARD.md`](docs/DATASET_CARD.md).
 
-## Branch utama dan alur kerja
+## 3. Instalasi dari Awal
 
-- Branch utama repository: **`master`**. Jangan mengubah nama branch atau pengaturan repository GitHub tanpa persetujuan.
-- Satu GitHub Issue per unit kerja. Kerjakan pada feature branch:
+### Prasyarat
+
+Siapkan Git, Python yang kompatibel dengan konfigurasi proyek, VS Code, ekstensi Kilo Code, dan akses repository GitHub organisasi. Bun diperlukan apabila digunakan oleh plugin logging Kilo Code.
+
+### Clone repository
+
+Buka terminal PowerShell:
 
 ```powershell
-git checkout -b issue-<nomor>-<slug>
+git clone https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer.git
+cd AyayoTeam_MiniTransformer
 ```
 
-- Setelah selesai, buka Pull Request ke `master`. Tulis pesan commit ringkas sesuai gaya repo.
-- Review oleh anggota selain pembuat; tes wajib lulus sebelum merge. Jangan merge langsung ke `master`.
-- Jangan menandai Issue Done sebelum acceptance criteria terpenuhi.
+Pastikan branch yang digunakan adalah `master`:
 
-## Setup
+```powershell
+git branch --show-current
+git pull --ff-only origin master
+```
 
-1. Python 3.x + PyTorch (instal via selector resmi pytorch.org), lalu dependensi pada `requirements.txt`.
-2. Salin `.kilo/member.local.example copy.json` menjadi `.kilo/member.local.json`, isi `member_id` unik Anda (file ini di-ignore Git).
-3. Jalankan smoke test logging di bawah sebelum mulai coding.
+### Siapkan environment Python
 
-## Logging AI
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+```
 
-Plugin `.kilo/plugin/mini-transformer-logger.ts` merekam event sesi Kilo:
+Instal dependency jika `requirements.txt` sudah tersedia dan terisi:
 
-- Raw: `docs/ai-logs/raw/<member-id>/<session-id>.jsonl`
-- Laporan: `docs/ai-logs/reports/AI-LOG-<member-id>-<session-id>.md`
+```powershell
+python -m pip install -r requirements.txt
+```
 
-Redaction aktif untuk API key, token, password. Jangan menulis data sensitif ke log.
+Periksa versi Python dan PyTorch sesuai konfigurasi proyek. Jangan memasang versi dependency berbeda tanpa persetujuan tim.
 
-### Smoke-test prompt
+### Buka proyek di VS Code
 
-> LOGGING SMOKE TEST. Do not edit any files or run commands. Reply exactly: `LOGGER-TEST-2026-01` and explain that this is only a test. This prompt and your response must be recorded by the project logger.
+```powershell
+code .
+```
 
-Setelah sesi, periksa raw JSONL berisi teks prompt dan respons Anda.
+Pastikan folder root proyek terbuka, bukan hanya salah satu subfolder. Kilo Code harus dapat membaca [`AGENTS.md`](AGENTS.md) dan dokumen dalam `docs/`.
 
-### Status verifikasi logging
+## 4. Konfigurasi Anggota dan Logging AI
 
-- Bukti tersedia untuk anggota `raihanfahrifi-80017`: dua sesi terekam (62 dan 1174 baris event), prompt dan respons tertangkap.
-- Bahwa satu anggota lolos **tidak** berarti semua lolos: setiap anggota wajib menjalankan smoke test pada instalasi/versi Kilo masing-masing dan mengonfirmasi capture sebelum coding.
+Setiap anggota menggunakan `member_id` unik, yang disimpan dalam konfigurasi lokal dan tidak di-commit.
 
-## Aturan proyek
+Contoh konfigurasi Raihan:
 
-- Ikuti `AGENTS.md` dan enam dokumen inti `docs/`.
-- Jangan mulai implementasi model sebelum Issue #1 selesai dan smoke test logging Anda lulus.
-- Jangan mengubah keputusan arsitektur tanpa mencatatnya di `docs/ARCHITECTURE_DECISIONS.md` dan memperoleh persetujuan tim.
+```json
+{
+  "member_id": "raihanfahrifi-80017"
+}
+```
+
+Salin file contoh konfigurasi anggota yang tersedia di folder `.kilo/` menjadi `member.local.json`. Sesuaikan `member_id` dengan identitas masing-masing.
+
+### Uji logging sebelum coding
+
+1. Pastikan plugin logging berhasil dimuat.
+2. Kirim prompt uji unik melalui Kilo Code.
+3. Periksa apakah prompt dan respons tercatat pada `docs/ai-logs/raw/<member-id>/`.
+4. Pastikan laporan Markdown terbentuk pada `docs/ai-logs/reports/`.
+5. Verifikasi isi laporan terhadap raw log.
+
+Setiap anggota wajib melakukan smoke test sendiri. Bukti keberhasilan satu anggota tidak membuktikan bahwa logging anggota lainnya sudah berfungsi.
+
+Jangan mulai pekerjaan coding yang wajib direkam sebelum logging pada environment anggota tersebut terverifikasi.
+
+## 5. Pembagian Tugas GitHub
+
+| Anggota | Issue | Tanggung jawab |
+|---|---|---|
+| Dzaki Alwan | [#2](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/2) | Data Pipeline & Tokenizer |
+| Firdaus Akbar Amrullah | [#3](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/3) | MiniGPT, Training & Generation |
+| Muhammad Raihan Fahrifi | [#4](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/4) | Komponen Inti Transformer |
+| Rafa Suryaputra | [#5](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/5) | Unit Test, Integrasi & Dokumentasi |
+| Rafa + seluruh anggota | [#6](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/6) | Validasi Logging Otomatis |
+| Seluruh tim | [#7](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/7) | Tracking pekerjaan |
+
+Issue #1 untuk spesifikasi teknis telah ditutup. Seluruh implementasi harus mengikuti `AGENTS.md`, `docs/TECH_SPEC.md`, dan acceptance criteria Issue terkait.
+
+## 6. Workflow Pengerjaan Berurutan
+
+Tim menggunakan pengerjaan bergantian, satu anggota aktif pada satu waktu. Setiap subtask harus diselesaikan dan diverifikasi sebelum anggota melanjutkan ke subtask berikutnya.
+
+Urutan kerja:
+
+1. Anggota mengumumkan giliran, Issue, dan subtask di grup.
+2. Pastikan working tree bersih dan sinkronkan `master`.
+3. Gunakan Prompt A untuk analisis dan perencanaan.
+4. Periksa serta setujui rencana.
+5. Gunakan Prompt B untuk implementasi satu subtask.
+6. Jalankan tes, tinjau diff, verifikasi logging, dan pahami hasil.
+7. Setelah direview, commit dan push perubahan yang sudah disetujui.
+8. Anggota berikutnya menjalankan `git pull --ff-only origin master` sebelum mulai.
+
+**Penting:** workflow master-only ini harus konsisten dengan `AGENTS.md`, `docs/AI_RULES.md`, dan kebijakan repository. Jika repository melarang push langsung ke `master`, jangan melewati proteksi. Ikuti workflow branch dan Pull Request yang berlaku sampai perubahan kebijakan disetujui.
+
+## 7. Prompt A — Analisis dan Perencanaan Subtask
+
+Gunakan sebelum menulis kode. Isi bagian anggota, Issue, dan subtask sesuai pekerjaan yang sedang dikerjakan.
+
+**Template:**
+
+```text
+# MINI-TRANSFORMER — SUBTASK PLANNING
+
+Repository: AI-IF-TelU/AyayoTeam_MiniTransformer
+
+Anggota: [NAMA ANGGOTA]
+Member ID: [MEMBER_ID]
+GitHub Issue: [NOMOR DAN JUDUL ISSUE]
+Subtask: [KODE DAN NAMA SUBTASK]
+
+Ikuti AGENTS.md, docs/TECH_SPEC.md, docs/AI_RULES.md,
+dan deskripsi lengkap GitHub Issue yang ditugaskan.
+
+Sebelum coding:
+1. Verifikasi repository, branch, kondisi Git, dan logging.
+2. Baca Issue beserta acceptance criteria dan dependensinya.
+3. Jelaskan tujuan, algoritma, tensor shapes, kompleksitas,
+   edge cases, dependensi, serta unit test.
+4. Sebutkan file yang perlu diubah dan rencana implementasinya.
+
+Jangan menulis kode atau mengerjakan subtask berikutnya.
+Jika ada konflik spesifikasi atau masalah Git, berhenti
+dan laporkan.
+
+Tunggu persetujuan saya sebelum implementasi.
+```
+
+### Contoh pengisian untuk Raihan
+
+```text
+Anggota: Muhammad Raihan Fahrifi
+Member ID: raihanfahrifi-80017
+GitHub Issue: #4 — [STEP 3] Issue B — Implementasi Komponen Inti Transformer
+Subtask: B1 — Periksa kontrak tensor dan parameter pada TECH_SPEC.md
+```
+
+Kode dan nama subtask harus mengikuti checklist aktual pada GitHub Issue.
+
+## 8. Prompt B — Implementasi Satu Subtask
+
+Gunakan setelah rencana Prompt A disetujui.
+
+**Template:**
+
+```text
+# MINI-TRANSFORMER — SUBTASK IMPLEMENTATION
+
+Lanjutkan subtask yang sudah disetujui.
+
+Anggota: [NAMA ANGGOTA]
+GitHub Issue: [NOMOR ISSUE]
+Subtask: [KODE DAN NAMA SUBTASK]
+
+Ikuti rencana yang disetujui, AGENTS.md,
+docs/TECH_SPEC.md, dan docs/AI_RULES.md.
+
+1. Implementasikan hanya subtask ini.
+2. Jelaskan kode, algoritma, dan alasan teknisnya.
+3. Buat atau perbarui unit test.
+4. Jalankan tes dan tampilkan output aktual.
+5. Periksa git diff --check, git status --short,
+   dan seluruh file yang berubah.
+6. Pastikan logging otomatis merekam sesi.
+7. Laporkan kriteria yang terpenuhi, kegagalan,
+   keterbatasan, dan hal yang perlu dipahami.
+
+Jangan mengerjakan subtask selanjutnya atau mengubah
+kontrak publik tanpa persetujuan.
+
+Berhenti setelah checkpoint selesai. Tunggu review
+sebelum melanjutkan.
+
+Jangan commit, push, merge, atau menutup Issue
+tanpa persetujuan eksplisit.
+```
+
+## 9. Checkpoint Sebelum Melanjutkan
+
+Setiap subtask hanya boleh dinyatakan selesai jika:
+
+- [ ] Implementasi sesuai spesifikasi.
+- [ ] Unit test relevan dijalankan dan hasilnya diverifikasi.
+- [ ] Anggota memahami kode dan algoritma yang dibuat.
+- [ ] Logging AI tersimpan dan dapat diperiksa.
+- [ ] Diff bersih dari perubahan di luar scope.
+- [ ] Hasil mendapat review sebelum dilanjutkan.
+
+Jika tes gagal, perbaiki terlebih dahulu. Jangan menandai task selesai atau mengarang hasil tes.
+
+## 10. Dokumentasi Proyek
+
+| Dokumen | Fungsi |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | Instruksi utama untuk AI coding agent |
+| [`docs/PRD.md`](docs/PRD.md) | Tujuan dan ruang lingkup |
+| [`docs/TECH_SPEC.md`](docs/TECH_SPEC.md) | Arsitektur dan kontrak teknis |
+| [`docs/AI_RULES.md`](docs/AI_RULES.md) | Aturan prompting dan coding |
+| [`docs/DATASET_CARD.md`](docs/DATASET_CARD.md) | Sumber data dan preprocessing |
+| [`docs/AI_LOG_TEMPLATE.md`](docs/AI_LOG_TEMPLATE.md) | Format laporan interaksi AI |
+| [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md) | Keputusan arsitektur dan trade-off |
+
+**Prinsip utama:** satu spesifikasi, satu standar pengujian, logging yang dapat diverifikasi, dan satu subtask aktif pada satu waktu. Tujuan proyek bukan hanya menghasilkan kode yang berjalan, tetapi juga memahami bagaimana Mini-Transformer dibangun.
