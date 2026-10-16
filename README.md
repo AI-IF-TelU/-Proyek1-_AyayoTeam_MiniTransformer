@@ -83,7 +83,12 @@ Salin file contoh konfigurasi anggota yang tersedia di folder `.kilo/` menjadi `
 ### Uji logging sebelum coding
 
 1. Pastikan plugin logging berhasil dimuat.
-2. Kirim prompt uji unik melalui Kilo Code.
+2. Kirim prompt smoke test berikut melalui Kilo Code:
+
+```text
+LOGGING SMOKE TEST. Do not edit any files or run commands. Reply exactly: LOGGER-TEST-2026-01 and explain that this is only a test. This prompt and your response must be recorded by the project logger.
+```
+
 3. Periksa apakah prompt dan respons tercatat pada `docs/ai-logs/raw/<member-id>/`.
 4. Pastikan laporan Markdown terbentuk pada `docs/ai-logs/reports/`.
 5. Verifikasi isi laporan terhadap raw log.
@@ -91,6 +96,10 @@ Salin file contoh konfigurasi anggota yang tersedia di folder `.kilo/` menjadi `
 Setiap anggota wajib melakukan smoke test sendiri. Bukti keberhasilan satu anggota tidak membuktikan bahwa logging anggota lainnya sudah berfungsi.
 
 Jangan mulai pekerjaan coding yang wajib direkam sebelum logging pada environment anggota tersebut terverifikasi.
+
+### Pencatatan dokumentasi interaksi AI
+
+Seluruh interaksi (prompt, respons, dan aktivitas coding) yang dilakukan setiap anggota melalui Kilo Code tercatat otomatis oleh plugin logging. Dokumentasi lengkap hasil interaksi AI tersimpan sebagai laporan Markdown di folder `docs/ai-logs/reports/` dengan nama `AI-LOG-<member-id>-<session-id>.md`, sedangkan data mentah per event tersimpan di `docs/ai-logs/raw/<member-id>/`. Log ini menjadi bukti verifikasi proses Vibe Coding dan tidak boleh dihapus atau dipalsukan.
 
 ## 5. Pembagian Tugas GitHub
 
