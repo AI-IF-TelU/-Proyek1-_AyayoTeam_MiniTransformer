@@ -14,13 +14,13 @@ These files are the source of truth. If there is a conflict, do not guess: repor
 
 ## Workflow
 
-- Work on one GitHub Issue at a time and only modify files within its scope.
+- Work on one GitHub Issue at a time and only modify files within its scope. Issues are mirrored locally in `issues/` (markdown); use them, no GitHub API/web access is needed.
 - Before coding, state the planned approach, interfaces/tensor shapes, complexity, edge cases, and tests.
 - Do not change public interfaces, architecture choices, dependencies, or unrelated files without approval.
 - Prefer small changes that can be tested independently.
 - Add or update tests for every behavior change.
 - Do not claim a test passed unless you actually ran it and observed the output.
-- The repository default branch is `master`. Do not merge directly to `master`; use a feature branch and pull request.
+- The repository uses one branch only: `master`. Do not create new branches, pull requests, or merge operations. Commit and push directly to `master`. Run `git pull --ff-only origin master` only when a teammate notifies you they have pushed changes (work is sequential).
 - Preserve meaningful AI interaction logs under `docs/ai-logs/`; never delete or fabricate logs.
 - Never write secrets, API keys, access tokens, passwords, or personal sensitive data to logs or Git.
 

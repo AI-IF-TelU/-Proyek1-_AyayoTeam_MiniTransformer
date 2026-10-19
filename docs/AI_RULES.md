@@ -1,7 +1,7 @@
 # AI Rules & Vibe Engineering Standard
 
 ## 1. Sumber instruksi
-Semua AI coding agent wajib membaca `AGENTS.md` serta enam dokumen inti dalam `docs/`. Jika instruksi bertentangan, hentikan perubahan dan laporkan konfliknya.
+Semua AI coding agent wajib membaca `AGENTS.md` serta enam dokumen inti dalam `docs/`. Jika instruksi bertentangan, hentikan perubahan dan laporkan konfliknya. Issue kerja tersedia lokal di folder `issues/`; AI agent tidak perlu akses GitHub.
 
 ## 2. Format prompt wajib
 Setiap prompt coding harus memuat:
@@ -37,9 +37,10 @@ Setiap prompt coding harus memuat:
 - Jangan menulis API key, token, password, atau data sensitif ke log.
 - Jika logger gagal, jangan melanjutkan coding proyek tanpa memberitahu anggota tim dan memperbaiki logger.
 - Raw log adalah bukti; ringkasan AI bukan pengganti raw log.
+## 7. Review dan push (master-only)
 
-## 7. Review dan merge
-- Gunakan branch per Issue dan Pull Request.
-- Tes wajib harus lulus sebelum merge.
-- PR harus ditinjau anggota selain pembuatnya.
+- Gunakan satu branch utama `master`. Dilarang membuat branch baru, pull request, atau merge.
+- Tes wajib harus lulus sebelum push.
+- Perubahan ditinjau anggota selain pembuatnya sebelum push.
+- `git pull --ff-only origin master` dijalankan hanya saat anggota lain mengabarkan telah push perubahan (pengerjaan berurutan).
 - Jangan menandai Issue Done sebelum acceptance criteria terpenuhi.

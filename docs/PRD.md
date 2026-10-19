@@ -34,4 +34,4 @@ Membangun Mini-GPT berukuran kecil yang mempelajari pola teks berita bahasa Indo
 - Tim: 4 anggota.
 - Durasi target: 2 minggu.
 - Framework: Python + PyTorch.
-- Workflow: Agile Kanban + Contract-First Development + GitHub Flow.
+- Workflow: Agile Kanban + Contract-First Development + master-only (satu branch, tanpa pull request).

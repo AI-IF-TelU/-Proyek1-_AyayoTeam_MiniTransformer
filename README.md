@@ -116,20 +116,20 @@ Issue #1 untuk spesifikasi teknis telah ditutup. Seluruh implementasi harus meng
 
 ## 6. Workflow Pengerjaan Berurutan
 
-Tim menggunakan pengerjaan bergantian, satu anggota aktif pada satu waktu. Setiap subtask harus diselesaikan dan diverifikasi sebelum anggota melanjutkan ke subtask berikutnya.
+Tim menggunakan pengerjaan bergantian, satu anggota aktif pada satu waktu. Setiap subtask harus diselesaikan dan diverifikasi sebelum anggota melanjutkan ke subtask berikutnya. Repository **master-only**: dilarang membuat branch baru, pull request, atau merge.
 
 Urutan kerja:
 
 1. Anggota mengumumkan giliran, Issue, dan subtask di grup.
-2. Pastikan working tree bersih dan sinkronkan `master`.
+2. Pastikan working tree bersih (`git status`).
 3. Gunakan Prompt A untuk analisis dan perencanaan.
 4. Periksa serta setujui rencana.
 5. Gunakan Prompt B untuk implementasi satu subtask.
 6. Jalankan tes, tinjau diff, verifikasi logging, dan pahami hasil.
-7. Setelah direview, commit dan push perubahan yang sudah disetujui.
-8. Anggota berikutnya menjalankan `git pull --ff-only origin master` sebelum mulai.
+7. Setelah direview anggota lain, commit dan push langsung ke `master`.
+8. Anggota berikutnya menjalankan `git pull --ff-only origin master` **hanya** jika anggota sebelumnya mengabarkan telah push perubahan.
 
-**Penting:** workflow master-only ini harus konsisten dengan `AGENTS.md`, `docs/AI_RULES.md`, dan kebijakan repository. Jika repository melarang push langsung ke `master`, jangan melewati proteksi. Ikuti workflow branch dan Pull Request yang berlaku sampai perubahan kebijakan disetujui.
+**Penting:** workflow master-only ini konsisten dengan `AGENTS.md` dan `docs/AI_RULES.md`. Seluruh Issue tersedia lokal di folder `issues/`; AI agent tidak perlu akses GitHub untuk membaca atau mengerjakan Issue.
 
 ## 7. Prompt A — Analisis dan Perencanaan Subtask
 
@@ -144,15 +144,15 @@ Repository: AI-IF-TelU/AyayoTeam_MiniTransformer
 
 Anggota: [NAMA ANGGOTA]
 Member ID: [MEMBER_ID]
-GitHub Issue: [NOMOR DAN JUDUL ISSUE]
+Issue: [NOMOR DAN JUDUL ISSUE] (dari folder `issues/`)
 Subtask: [KODE DAN NAMA SUBTASK]
 
 Ikuti AGENTS.md, docs/TECH_SPEC.md, docs/AI_RULES.md,
-dan deskripsi lengkap GitHub Issue yang ditugaskan.
+dan deskripsi lengkap Issue yang ditugaskan (folder `issues/`).
 
 Sebelum coding:
-1. Verifikasi repository, branch, kondisi Git, dan logging.
-2. Baca Issue beserta acceptance criteria dan dependensinya.
+1. Verifikasi repository, branch (harus `master`, tanpa membuat branch baru), kondisi Git, dan logging.
+2. Baca Issue beserta acceptance criteria dan dependensinya (lokal di folder `issues/`).
 3. Jelaskan tujuan, algoritma, tensor shapes, kompleksitas,
    edge cases, dependensi, serta unit test.
 4. Sebutkan file yang perlu diubah dan rencana implementasinya.
@@ -169,11 +169,11 @@ Tunggu persetujuan saya sebelum implementasi.
 ```text
 Anggota: Muhammad Raihan Fahrifi
 Member ID: raihanfahrifi-80017
-GitHub Issue: #4 — [STEP 3] Issue B — Implementasi Komponen Inti Transformer
+Issue: #4 — [STEP 3] Issue B — Implementasi Komponen Inti Transformer
 Subtask: B1 — Periksa kontrak tensor dan parameter pada TECH_SPEC.md
 ```
 
-Kode dan nama subtask harus mengikuti checklist aktual pada GitHub Issue.
+Kode dan nama subtask harus mengikuti checklist aktual pada Issue (lokal di folder `issues/`).
 
 ## 8. Prompt B — Implementasi Satu Subtask
 
@@ -187,7 +187,7 @@ Gunakan setelah rencana Prompt A disetujui.
 Lanjutkan subtask yang sudah disetujui.
 
 Anggota: [NAMA ANGGOTA]
-GitHub Issue: [NOMOR ISSUE]
+Issue: [NOMOR ISSUE] (dari folder `issues/`)
 Subtask: [KODE DAN NAMA SUBTASK]
 
 Ikuti rencana yang disetujui, AGENTS.md,
@@ -209,8 +209,9 @@ kontrak publik tanpa persetujuan.
 Berhenti setelah checkpoint selesai. Tunggu review
 sebelum melanjutkan.
 
-Jangan commit, push, merge, atau menutup Issue
-tanpa persetujuan eksplisit.
+Jangan commit, push, atau menutup Issue tanpa persetujuan
+eksplisit. Push hanya ke `master` (master-only; dilarang
+branch baru, PR, atau merge).
 ```
 
 ## 9. Checkpoint Sebelum Melanjutkan
