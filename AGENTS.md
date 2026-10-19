@@ -20,7 +20,7 @@ These files are the source of truth. If there is a conflict, do not guess: repor
 - Prefer small changes that can be tested independently.
 - Add or update tests for every behavior change.
 - Do not claim a test passed unless you actually ran it and observed the output.
-- The repository uses one branch only: `master`. Do not create new branches, pull requests, or merge operations. Commit and push directly to `master`. Run `git pull --ff-only origin master` only when a teammate notifies you they have pushed changes (work is sequential).
+- The repository uses one branch only: `master`. Do not create new branches, pull requests, or merge operations. All Git operations (commit, push, pull, branch, merge, staging) are performed by the team member, never by the AI agent. The repository stays master-only; teammates coordinate pushes so work stays sequential.
 - Preserve meaningful AI interaction logs under `docs/ai-logs/`; never delete or fabricate logs.
 - Never write secrets, API keys, access tokens, passwords, or personal sensitive data to logs or Git.
 

@@ -158,6 +158,9 @@ Sebelum coding:
 4. Sebutkan file yang perlu diubah dan rencana implementasinya.
 
 Jangan menulis kode atau mengerjakan subtask berikutnya.
+Jangan menjalankan operasi Git apa pun (commit, push, pull,
+branch, merge, staging) — seluruh kerja Git dilakukan oleh
+anggota; repo tetap master-only (tanpa branch baru).
 Jika ada konflik spesifikasi atau masalah Git, berhenti
 dan laporkan.
 
@@ -197,8 +200,8 @@ docs/TECH_SPEC.md, dan docs/AI_RULES.md.
 2. Jelaskan kode, algoritma, dan alasan teknisnya.
 3. Buat atau perbarui unit test.
 4. Jalankan tes dan tampilkan output aktual.
-5. Periksa git diff --check, git status --short,
-   dan seluruh file yang berubah.
+5. Tampilkan seluruh file yang berubah untuk direview
+   (jangan menjalankan operasi Git apa pun).
 6. Pastikan logging otomatis merekam sesi.
 7. Laporkan kriteria yang terpenuhi, kegagalan,
    keterbatasan, dan hal yang perlu dipahami.
@@ -209,9 +212,10 @@ kontrak publik tanpa persetujuan.
 Berhenti setelah checkpoint selesai. Tunggu review
 sebelum melanjutkan.
 
-Jangan commit, push, atau menutup Issue tanpa persetujuan
-eksplisit. Push hanya ke `master` (master-only; dilarang
-branch baru, PR, atau merge).
+Jangan menjalankan operasi Git apa pun (commit, push, pull,
+branch, merge, staging). Seluruh kerja Git dilakukan oleh
+anggota; repo tetap master-only (tanpa branch baru,
+tanpa PR/merge).
 ```
 
 ## 9. Checkpoint Sebelum Melanjutkan

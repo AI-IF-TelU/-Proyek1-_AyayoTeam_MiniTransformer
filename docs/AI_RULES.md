@@ -40,7 +40,8 @@ Setiap prompt coding harus memuat:
 ## 7. Review dan push (master-only)
 
 - Gunakan satu branch utama `master`. Dilarang membuat branch baru, pull request, atau merge.
+- Seluruh operasi Git (commit, push, pull, branch, merge, staging) dilakukan oleh anggota, bukan AI agent.
 - Tes wajib harus lulus sebelum push.
 - Perubahan ditinjau anggota selain pembuatnya sebelum push.
-- `git pull --ff-only origin master` dijalankan hanya saat anggota lain mengabarkan telah push perubahan (pengerjaan berurutan).
+- `git pull --ff-only origin master` dilakukan anggota hanya saat anggota lain mengabarkan telah push perubahan (pengerjaan berurutan).
 - Jangan menandai Issue Done sebelum acceptance criteria terpenuhi.
