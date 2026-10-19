@@ -58,6 +58,31 @@ Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Jangan melompat a
 - [ ] **A2. Identifikasi kolom, lisensi, sumber, data kosong, dan duplikasi.** Periksa kolom `content` vs opsional lain, catat jumlah baris kosong, contoh duplikasi konten ternormalisasi, dan status lisensi/provenance. *Hasil:* tabel kualitas data kasar.
 - [ ] **A3. Tentukan metode pengambilan subset 1.000 artikel tanpa mengunduh data yang tidak diperlukan.** Pilih strategi (streaming/select/head) yang hanya memuat kolom dan jumlah artikel yang dibutuhkan; dokumentasikan trade-off. *Hasil:* rencana subset tertulis.
 - [ ] **A4. Ambil subset dan simpan metadata sumber.** Eksekusi strategi A3, catat tanggal akses, versi/revision, jumlah baris, filter yang diterapkan; simpan unduhan ke `data/raw/`. *Hasil:* subset terunduh di `data/raw/` + metadata sumber tersimpan.
+
+> **Referensi — unduh dataset via HuggingFace (streaming, tanpa kolom `embedding` 1.25 GB):**
+>
+> ```python
+> from datasets import load_dataset
+>
+> ds = load_dataset(
+>     "fahadh4ilyas/indonesian_news_datasets",
+>     split="train",
+>     streaming=True,
+> )
+>
+> rows = []
+> for row in ds:
+>     content = (row.get("content") or "").strip()
+>     if not content:
+>         continue
+>     rows.append({"content": content})
+>     if len(rows) >= 1000:
+>         break
+>
+> # rows siap untuk langkah selanjutnya (deduplikasi + split)
+> ```
+>
+> Catatan: `streaming=True` hanya memuat seperlunya; kolom `embedding` (1.25 GB file) tidak ikut terunduh karena tidak dipilih. Simpan metadata (tanggal akses, versi/revision, jumlah baris sebelum/sesudah filter) untuk A13 (DATASET_CARD). Lisensi CC BY-NC 4.0 wajib diperiksa ulang di halaman HF (A1/A2).
 - [ ] **A5. Terapkan deduplikasi dan split berdasarkan dokumen.** Normalisasi-deduplikasi; pertahankan split bawaan train/test; validation diambil 10% dari split train (seed 42). Fallback 80/10/10 tidak dipakai (ADR-012). *Hasil:* dokumen unik, jumlah train/val/test tercatat.
 - [ ] **A6. Implementasikan tokenizer regex lowercase.** Buat fungsi tokenisasi `re.findall(r"\w+|[^\w\s]", text)` setelah lowercase. *Hasil:* unit test tokenisasi dasar.
 - [ ] **A7. Implementasikan `fit`, `encode`, `decode`.** Bangun kelas tokenizer: urutan special token 0–3, vocab hasil regex diurutkan frekuensi, `encode`/`decode`/`vocab_size` sesuai §3. *Hasil:* kelas tokenizer lengkap + test unit.
