@@ -46,18 +46,18 @@ Ringkasan kontrak yang harus jadi dasar test case:
 Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Setiap pemilik modul (A/B/C) tetap wajib membuat dan menjalankan unit test atas kode mereka sendiri; Issue ini mengoordinasikan dan melengkapi pengujian lintas modul.
 
 - [ ] **D1. Periksa acceptance criteria pada Issue #2–#4.** Kumpulkan daftar kontrak dan kriteria yang wajib diverifikasi lintas modul; tandai mana yang sudah dituliskan tes lokal oleh pemilik modul. *Hasil:* matriks kontrak→test→status.
-- [ ] **D2. Tentukan framework testing berdasarkan keputusan dependency yang disetujui koordinator.** Verifikasi izin memakai `pytest`/runner lain; tanpa dependency baru tanpa persetujuan. Catat keputusan di laporan. *Hasil:* keputusan runner terdokumentasi.
+- [ ] **D2. Terapkan framework testing resmi `pytest` (ditetapkan koordinator 2026-10-19).** Pakai `pytest` (sudah di `requirements.txt`); catat keputusan dan perintah runner di laporan. *Hasil:* keputusan runner terdokumentasi.
 - [ ] **D3. Siapkan struktur unit test berdasarkan kontrak modul.** Buat `tests/` (conftest + helper shape/data) sesuai `TECH_SPEC.md` §3–§6. *Hasil:* struktur test ter-commit, bisa dijalankan (meski sebagian test menunggu modul).
 - [ ] **D4. Buat tes tokenizer dan data pipeline.** Id special, lowercase, `<unk>`, urutan frekuensi, relasi `x[i,t]==y[i,t-1]`, no-window-crossing, padding. *Hasil:* test kontrak pipeline data siap; hasil aktual saat modul A tersedia.
 - [ ] **D5. Buat tes Positional Encoding dan causal masking.** Shape, buffer non-trainable, `ValueError T > max_len`, invariance causal mask. *Hasil:* test kontrak PE/MHA siap.
-- [ ] **D6. Buat tes Decoder Block dan MiniGPT.** Shape forward, residual/pre-norm, `ValueError T > context_length`, gradient mengalir. *Hasil:* test kontrak model siap.
+- [ ] **D6. Buat tes Decoder Block dan MiniGPT.** Shape forward, residual/pre-norm, gradient mengalir; `ValueError T > context_length` hanya untuk MiniGPT (DecoderBlock tidak mewajibkannya — kontrak TECH_SPEC §6). *Hasil:* test kontrak model siap.
 - [ ] **D7. Buat tes training step, loss, dan pembaruan parameter.** Loss finite, bobot berubah setelah step, posisi pad diabaikan di loss. *Hasil:* test kontrak training siap.
 - [ ] **D8. Jalankan tes ketika tiap modul tersedia.** Jalankan per modul saat Issue A/B/C menyelesaikan komponennya; catat command, output, dan status pass/fail aktual. *Hasil:* status tes lintas modul terbaharui.
 - [ ] **D9. Identifikasi error dan catat bukti reproduksinya.** Tiap kegagalan dicatat dengan traceback/error aktual dan langkah reproduksi; laporkan ke pemilik modul. *Hasil:* log kegagalan berdasar bukti.
 - [ ] **D10. Verifikasi perbaikan berdasarkan tes aktual.** Setelah pemilik modul memperbaiki, jalankan ulang tes dan catat output. *Hasil:* temuan tertutup dengan bukti tes lulus.
 - [ ] **D11. Jalankan tes integrasi setelah komponen yang dibutuhkan tersedia.** Seluruh tes kontrak A/B/C dijalankan bersama dalam satu run (e.g. tokenizer→dataset→model→loss→generation). *Hasil:* satu perintah menjalankan seluruh suite tanpa mengubah kontrak sepihak.
 - [ ] **D12. Susun dokumentasi pengujian dan hasil eksperimen.** Rangkum perintah runner, matriks kontrak→test, hasil integrasi, dan riwayat debugging di `docs/` serta README. *Hasil:* dokumentasi testing lengkap.
-- [ ] **D13. Susun laporan akhir berdasarkan bukti aktual.** Rekap seluruh acceptance criteria Issues #2–#4 terverifikasi/tidak, dengan bukti konkret; tanpa klaim keberhasilan yang belum dijalankan. *Hasil:* laporan akhir ber-evidence.
+- [ ] **D13. Susun laporan akhir berdasarkan bukti aktual.** Rekap seluruh acceptance criteria Issues #2–#6 terverifikasi/tidak, dengan bukti konkret; tanpa klaim keberhasilan yang belum dijalankan. *Hasil:* laporan akhir ber-evidence.
 
 ## 8. Instruksi pengerjaan setiap subtask
 
@@ -84,7 +84,7 @@ Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Setiap pemilik mo
 - [ ] Hasil tes dan error dicatat berdasarkan output aktual; tidak dikarang.
 - [ ] Integrasi dilakukan tanpa mengubah kontrak publik secara sepihak (perubahan berkoordinasi dengan penulis modul + ADR bila perlu).
 - [ ] Seluruh kegagalan relevan dilaporkan dan ditindaklanjuti dengan bukti.
-- [ ] Matriks kontrak→test→status (D1) lengkap dan mencerminkan acceptance criteria Issues #2–#4.
+- [ ] Matriks kontrak→test→status (D1) lengkap dan mencerminkan acceptance criteria Issues #2–#6.
 - [ ] Setiap subtask D1–D13 memiliki bukti berupa output aktual atau test yang dijalankan.
 
 ## 11. Unit test yang diperlukan

@@ -18,7 +18,7 @@ Implementasi model bahasa generatif kecil menggunakan arsitektur **Decoder-only 
 - Git dan GitHub.
 - Dataset: [Indonesian News Datasets](https://huggingface.co/datasets/fahadh4ilyas/indonesian_news_datasets).
 
-Dataset awal menggunakan subset 500–2.000 artikel. Pemrosesan, split berdasarkan dokumen, tokenizer, dan pembentukan data training mengikuti [`docs/DATASET_CARD.md`](docs/DATASET_CARD.md).
+Dataset awal menggunakan subset 1.000 artikel (keputusan koordinator 19 Okt 2026; ADR-012). Pemrosesan, split berdasarkan dokumen, tokenizer, dan pembentukan data training mengikuti [`docs/DATASET_CARD.md`](docs/DATASET_CARD.md).
 
 ## 3. Instalasi dari Awal
 
@@ -68,7 +68,7 @@ Pastikan folder root proyek terbuka, bukan hanya salah satu subfolder. Kilo Code
 
 ## 4. Konfigurasi Anggota dan Logging AI
 
-Setiap anggota menggunakan `member_id` unik, yang disimpan dalam konfigurasi lokal dan tidak di-commit.
+Setiap anggota menggunakan `member_id` unik, yang disimpan dalam konfigurasi lokal dan tidak di-commit. Format `member_id`: nama tanpa spasi (lowercase) + `-` + 5 digit terakhir NIM. Contoh: `raihanfahrifi-80017`.
 
 Contoh konfigurasi Raihan:
 
@@ -78,7 +78,7 @@ Contoh konfigurasi Raihan:
 }
 ```
 
-Salin file contoh konfigurasi anggota yang tersedia di folder `.kilo/` menjadi `member.local.json`. Sesuaikan `member_id` dengan identitas masing-masing.
+Salin `.kilo/member.local.example.json` menjadi `.kilo/member.local.json`. Sesuaikan `member_id` dengan identitas masing-masing (lihat format di atas).
 
 ### Uji logging sebelum coding
 

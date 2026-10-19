@@ -13,12 +13,12 @@
 | Decoder Block | Pre-LayerNorm; residual; FFN `d_ff = 4 * d_model`; GELU; dropout `0.1`; LayerNorm epsilon `1e-5` | ADR-007 |
 | Tokenizer | Regex `r"\w+|[^\w\s]"`; lowercase sebelum tokenisasi | ADR-008 |
 | Special tokens | `<pad>=0`, `<bos>=1`, `<eos>=2`, `<unk>=3` | ADR-008 |
-| Dataset | Indonesian News Datasets (kolom `content`); subset awal 500–2.000 artikel | ADR-003 |
-| Split | Per dokumen; 80/10/10 seed 42 hanya jika split bawaan tidak tersedia/tidak layak | ADR-010 |
+| Dataset | Indonesian News Datasets (kolom `content`); subset awal 1.000 artikel | ADR-003, ADR-012 |
+| Split | Per dokumen; split bawaan train/test dipertahankan; validation 10% dari train (seed 42); fallback 80/10/10 tidak dipakai | ADR-010, ADR-012 |
 | Objektif | Next-token prediction | ADR-001 |
 | Loss | Cross-Entropy, token pad di target diabaikan (`ignore_index=pad_id`) | TECH_SPEC §5 |
 | Optimizer | AdamW; awal `lr=3e-4`, `weight_decay=0.01` | TECH_SPEC §6 |
-| Konfigurasi awal | `n_layers=2`, `n_heads=4`, `d_model=64`, `context_length=64`, `ff_dim=256` | ADR-004 |
+| Konfigurasi awal | `n_layers=2`, `n_heads=4`, `d_model=64`, `context_length=64`, `d_ff=256` | ADR-004 |
 | Seed | 42 (split data dan random seed) | ADR-010 |
 
 Semua angka hiperparameter adalah titik awal yang boleh disesuaikan melalui eksperimen terdokumentasi, tanpa mengubah arsitektur inti.
@@ -97,7 +97,7 @@ Edge cases: dokumen hasil tokenisasi kosong dibuang; dokumen 1 token tidak mengh
 ### Training (`src/train.py`)
 
 - Batch size 32; epochs 10 (awal); AdamW `lr=3e-4`, `weight_decay=0.01`; seed 42 (Python, NumPy, PyTorch).
-- Tiap epoch: hitung train loss dan validation loss; catat ke `outputs/metrics/` (CSV/JSONL) dan laporkan di laporan akhir.
+- Tiap epoch: hitung train loss dan validation loss; catat ke `outputs/metrics/` (format JSONL; ADR-011) dan laporkan di laporan akhir.
 
 ### Generation (`src/generate.py`)
 
@@ -116,6 +116,7 @@ Contoh baseline (`B=32, T=64, d=64, H=4`): attention time ≈ 32·4096·64 ≈ 8
 
 ## 8. Data split
 
+- Split bawaan dataset (train 25.8k / test 6.46k) dipertahankan tanpa resplit (ADR-010). Tidak ada split validation bawaan, sehingga validation diambil 10% dari split train (seed 42) — ADR-012. Fallback 80/10/10 tidak digunakan pada proyek ini.
 - Jangan pegang test split bawaan jika tersedia dan kualitasnya terverifikasi; jika tidak, fallback 80/10/10 seed 42.
 - Split dilakukan per dokumen sebelum tokenisasi dan pembuatan window (mencegah kebocoran antarartikel).
 - Strategi aktual (jumlah artikel per split, jumlah token, ukuran vocab) dicatat di `DATASET_CARD.md` pada langkah dataset.

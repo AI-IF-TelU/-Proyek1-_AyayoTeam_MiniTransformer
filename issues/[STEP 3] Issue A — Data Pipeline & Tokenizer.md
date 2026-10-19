@@ -4,19 +4,21 @@
 
 ## 1. Tujuan
 
-Membangun pipeline data end-to-end: mengakses Indonesian News Datasets, memilih subset 500–2.000 artikel, memvalidasi isi/metadata/lisensi, membangun tokenizer regex + vocabulary dari data train, membangun pasangan input-target (sliding window + padding), dan data loader sesuai kontrak `docs/TECH_SPEC.md`.
+Membangun pipeline data end-to-end: mengakses Indonesian News Datasets, memilih subset 1.000 artikel, memvalidasi isi/metadata/lisensi, membangun tokenizer regex + vocabulary dari data train, membangun pasangan input-target (sliding window + padding), dan data loader sesuai kontrak `docs/TECH_SPEC.md`.
 
 ## 2. Konteks teknis dan file terkait
 
 - `docs/TECH_SPEC.md` §3 (tokenizer), §4 (dataset), §8 (split).
 - `docs/DATASET_CARD.md`, `docs/ARCHITECTURE_DECISIONS.md` ADR-003, ADR-008, ADR-010.
 - Dataset: https://huggingface.co/datasets/fahadh4ilyas/indonesian_news_datasets (kolom `content`).
-- File target: `src/data/tokenizer.py`, `src/data/dataset.py` (susunan folder final dikonfirmasi saat integrasi dengan koordinator).
+- File target: `src/data/tokenizer.py`, `src/data/dataset.py` (susunan folder final dikonfirmasi koordinator 2026-10-19 — Opsi 1, tetap per kontrak TECH_SPEC §6).
 - Konfigurasi: `context_length=64`, `<pad>=0`, `<bos>=1`, `<eos>=2`, `<unk>=3`, seed 42.
+- Subset & split (keputusan koordinator 2026-10-19, ADR-012): **1.000 artikel**; pertahankan split bawaan train/test (25.8k/6.46k) tanpa resplit; validation diambil 10% dari split train (seed 42). Fallback 80/10/10 **tidak dipakai**.
+- Lokasi penyimpanan: unduhan subset di `data/raw/`; hasil olahan (dedup/split/tokenized) di `data/processed/` (keputusan koordinator 2026-10-19).
 
 ## 3. Ruang lingkup
 
-1. Unduh dataset; pilih subset 500–2.000 artikel kolom `content`.
+1. Unduh dataset; pilih subset 1.000 artikel kolom `content`.
 2. Periksa metadata kolom/split yang tersedia, lisensi (CC BY-NC 4.0) dan syarat penggunaan terkini, baris kosong, duplikasi konten ternormalisasi.
 3. Implementasi tokenizer sesuai kontrak §3: `fit(texts)`, `encode(text)`, `decode(ids)`, properti `vocab_size`.
 4. Implementasi dataset sesuai §4: deduplikasi → split per dokumen → tokenisasi → sisipkan `bos_id`/`eos_id` → sliding window (65, stride 1; dokumen pendek → pasangan pendek, pad saat batching) → `DataLoader` dengan collate pad (0).
@@ -54,9 +56,9 @@ Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Jangan melompat a
 
 - [ ] **A1. Baca spesifikasi dan periksa metadata dataset.** Baca `TECH_SPEC.md` §3–§4, §8, `DATASET_CARD.md`, ADR-003/008/010. Periksa metadata aktual dataset (kolom atau split yang tersedia, lisensi, syarat penggunaan). *Hasil:* ringkasan metadata aktual ditulis di laporan AI.
 - [ ] **A2. Identifikasi kolom, lisensi, sumber, data kosong, dan duplikasi.** Periksa kolom `content` vs opsional lain, catat jumlah baris kosong, contoh duplikasi konten ternormalisasi, dan status lisensi/provenance. *Hasil:* tabel kualitas data kasar.
-- [ ] **A3. Tentukan metode pengambilan subset 500–2.000 artikel tanpa mengunduh data yang tidak diperlukan.** Pilih strategi (streaming/select/head) yang hanya memuat kolom dan jumlah artikel yang dibutuhkan; dokumentasikan trade-off. *Hasil:* rencana subset tertulis.
-- [ ] **A4. Ambil subset dan simpan metadata sumber.** Eksekusi strategi A3, catat tanggal akses, versi/revision, jumlah baris, filter yang diterapkan. *Hasil:* subset terunduh + metadata sumber tersimpan.
-- [ ] **A5. Terapkan deduplikasi dan split berdasarkan dokumen.** Normalisasi-deduplikasi, lalu split 80/10/10 seed 42 hanya jika split bawaan tidak tersedia/tidak layak. *Hasil:* dokumen unik, jumlah train/val/test tercatat.
+- [ ] **A3. Tentukan metode pengambilan subset 1.000 artikel tanpa mengunduh data yang tidak diperlukan.** Pilih strategi (streaming/select/head) yang hanya memuat kolom dan jumlah artikel yang dibutuhkan; dokumentasikan trade-off. *Hasil:* rencana subset tertulis.
+- [ ] **A4. Ambil subset dan simpan metadata sumber.** Eksekusi strategi A3, catat tanggal akses, versi/revision, jumlah baris, filter yang diterapkan; simpan unduhan ke `data/raw/`. *Hasil:* subset terunduh di `data/raw/` + metadata sumber tersimpan.
+- [ ] **A5. Terapkan deduplikasi dan split berdasarkan dokumen.** Normalisasi-deduplikasi; pertahankan split bawaan train/test; validation diambil 10% dari split train (seed 42). Fallback 80/10/10 tidak dipakai (ADR-012). *Hasil:* dokumen unik, jumlah train/val/test tercatat.
 - [ ] **A6. Implementasikan tokenizer regex lowercase.** Buat fungsi tokenisasi `re.findall(r"\w+|[^\w\s]", text)` setelah lowercase. *Hasil:* unit test tokenisasi dasar.
 - [ ] **A7. Implementasikan `fit`, `encode`, `decode`.** Bangun kelas tokenizer: urutan special token 0–3, vocab hasil regex diurutkan frekuensi, `encode`/`decode`/`vocab_size` sesuai §3. *Hasil:* kelas tokenizer lengkap + test unit.
 - [ ] **A8. Uji special tokens dan pastikan vocabulary hanya dibuat dari data training.** Tulis test yang membuktikan semua token id validation/test ada di vocab train (tanpa leakage). *Hasil:* test leakage lulus dengan output aktual.

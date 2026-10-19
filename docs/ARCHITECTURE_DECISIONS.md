@@ -27,7 +27,7 @@ Status yang dipakai: `Accepted` (disetujui), `Proposed` (masih perlu persetujuan
 
 ## ADR-004 — Konfigurasi awal kecil
 - Konteks: Model pertama harus bisa di-debug dan dilatih CPU; dimensi harus konsisten antar modul.
-- Keputusan: Mulai dari `n_layers=2`, `n_heads=4`, `d_model=64`, `context_length=64`, `ff_dim=256`. `d_model % n_heads == 0` (head_dim 16).
+- Keputusan: Mulai dari `n_layers=2`, `n_heads=4`, `d_model=64`, `context_length=64`, `d_ff=256`. `d_model % n_heads == 0` (head_dim 16).
 - Alasan: Dimensi kecil memudahkan debugging; `B·H·T² = 32·4·4096` ≈ 2 MiB per matriks attention.
 - Trade-off: Kapasitas model dan kualitas generasi terbatas.
 - Status: Accepted (baseline disahkan via Issue #1 Step 2). Catatan: verifikasi bentuk tensor aktual dilakukan pada langkah implementasi; jika shape test menemukan ketidakcocokan, revisi ADR wajib dicatat.
@@ -74,3 +74,17 @@ Status yang dipakai: `Accepted` (disetujui), `Proposed` (masih perlu persetujuan
 - Alasan: Split per dokumen mencegah kebocoran antarartikel; window stride 1 memaksimalkan data dari subset kecil.
 - Trade-off: Stride 1 menambah jumlah training sample (redudansi antar window overlapping); seed tetap menjadikan hasil reproducible.
 - Status: Accepted (Issue #1 Step 2).
+
+## ADR-011 — Format metrik output: JSONL
+- Konteks: `TECH_SPEC.md` §6 membiarkan dua opsi format metrik ("CSV/JSONL"); Issue C butuh satu format pasti.
+- Keputusan: Metrik training per-epoch ditulis sebagai JSONL ke `outputs/metrics/` (satu objek JSON per baris).
+- Alasan: JSONL append-friendly untuk logging per-epoch, mudah dibaca ulang dengan `pandas`/`json`; konsisten dengan raw AI log yang sudah JSONL.
+- Trade-off: Kurang tabular dibanding CSV untuk spreadsheet langsung.
+- Status: Accepted (disetujui koordinator 2026-10-19; verifikasi implementasi dicatat di Issue C).
+
+## ADR-012 — Jumlah subset dataset dan strategi validation split
+- Konteks: `TECH_SPEC.md` §1 dan `DATASET_CARD.md` membiarkan range subset 500–2.000 artikel dan hanya menyebut fallback split 80/10/10; dataset bawaan menyediakan split train (25.8k) dan test (6.46k) tetapi tidak ada split validation.
+- Keputusan: Subset = 1.000 artikel. Pertahankan split bawaan train/test tanpa resplit (ADR-010). Validation diambil 10% dari split train (seed 42). Fallback 80/10/10 tidak dipakai.
+- Alasan: Data HF diverifikasi punya split bawaan; test bawaan tidak boleh diresplit; validation tetap dibutuhkan untuk memantau loss per-epoch (Issue C) sehingga disisihkan dari train secara deterministik. 1.000 artikel cukup untuk model kecil d64 di CPU dengan waktu training realistis.
+- Trade-off: Rasio akhir bukan 80/10/10 murni (~72/8/20 terhadap total dataset); subset kecil membatasi kualitas generasi.
+- Status: Accepted (disetujui koordinator 2026-10-19; angka aktual diverifikasi pada Issue A dan dicatat di DATASET_CARD).

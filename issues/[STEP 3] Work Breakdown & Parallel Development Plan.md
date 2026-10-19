@@ -66,9 +66,9 @@ Setiap anggota: bekerja langsung di branch `master` (master-only, tanpa branch b
 | Anggota | Tool | Status smoke test | Catatan |
 |---|---|---|---|
 | Muhammad Raihan Fahrifi | Kilo | ✅ Lulus (2 sesi terverifikasi, ADR-006) | Plugin `.kilo/plugin/mini-transformer-logger.ts` |
-| Dzaki Alwan | — | ⬜ Belum diverifikasi | Smoke test menunggu |
-| Firdaus Akbar Amrullah | — | ⬜ Belum diverifikasi | Smoke test menunggu |
-| Rafa Suryaputra | — | ⬜ Belum diverifikasi | Smoke test menunggu |
+| Dzaki Alwan | — | ⬜ Belum diverifikasi | Smoke test 19 Okt; dimonitor koordinator — tidak ditandai lulus tanpa bukti |
+| Firdaus Akbar Amrullah | — | ⬜ Belum diverifikasi | Smoke test 19 Okt; dimonitor koordinator — tidak ditandai lulus tanpa bukti |
+| Rafa Suryaputra | — | ⬜ Belum diverifikasi | Smoke test 19 Okt; dimonitor koordinator — tidak ditandai lulus tanpa bukti |
 
 ## Status task dan acceptance criteria (keseluruhan)
 
@@ -93,8 +93,11 @@ Per subtask acceptance criteria verifiable, setiap anggota bertanggung jawab ata
 
 ## Catatan hambatan dan keputusan yang masih tertunda
 
-- **Assignment GitHub:** username anggota belum terverifikasi di organisasi. Koordinator menugaskan setelah verifikasi.
-- **Framework testing:** Issue D akan memverifikasi izin `pytest`/runner lain — keputusan pakai dependency baru butuh persetujuan koordinator.
+- **Assignment GitHub:** dianggap selesai per keputusan koordinator (2026-10-19). Assignment GitHub aktual dikerjakan koordinator/anggota secara manual; tidak diverifikasi via API oleh AI agent.
+- **Framework testing:** **`pytest`** ditetapkan koordinator (2026-10-19) sebagai runner resmi. Issue D D2 menggunakannya tanpa izin tambahan.
+- **Struktur file final (keputusan koordinator 2026-10-19, Opsi 1):** tetap persis per kontrak TECH_SPEC §6 — `src/data/tokenizer.py`, `src/data/dataset.py`, `src/model/{positional_encoding,attention,decoder_block,minigpt}.py`, `src/train.py`, `src/generate.py`, opsional `src/config.py`. Tidak ada `src/data/preprocessing.py`, `scripts/prepare_data.py`, `src/training/`, `src/generation/`, `configs/`. Kalimat "dikonfirmasi saat integrasi" pada Issue A §2 dan Issue B §2 telah diubah menjadi "dikonfirmasi koordinator 2026-10-19".
+- **Format metrik output:** **JSONL** (keputusan koordinator 2026-10-19; ADR-011) — menggantikan pilihan ganda CSV/JSONL pada TECH_SPEC §6 dan Issue C.
+- **Jumlah subset dataset & strategi split (keputusan koordinator 2026-10-19):** subset = **1.000 artikel**; split bawaan train/test (25.8k/6.46k) dipertahankan tanpa resplit; validation diambil 10% dari split train (seed 42); fallback 80/10/10 **tidak dipakai** (ADR-012).
 - **Kerja di `master` langsung (master-only):** seluruh anggota bekerja pada satu branch `master`. Dilarang membuat branch baru, pull request, atau merge. `git pull --ff-only origin master` hanya dijalankan saat anggota lain mengabarkan telah push (pengerjaan berurutan, saling menunggu).
 - **ADR-006 pembaruan tingkat verifikasi:** menunggu seluruh smoke test anggota selesai dan disetujui tim.
 

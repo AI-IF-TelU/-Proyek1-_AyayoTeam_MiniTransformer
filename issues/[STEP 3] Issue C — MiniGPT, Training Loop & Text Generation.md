@@ -9,9 +9,9 @@ Merakit MiniGPT (decoder-only) dari komponen inti, membangun training loop (Cros
 ## 2. Konteks teknis dan file terkait
 
 - `docs/TECH_SPEC.md` §5 (loss), §6 (MiniGPT, Training, Generation), §7 (kompleksitas); `docs/ARCHITECTURE_DECISIONS.md` ADR-004, ADR-009.
-- File target: `src/model/minigpt.py`, `src/train.py`, `src/generate.py` (dan `src/config.py` bila diperlukan).
+- File target: `src/model/minigpt.py`, `src/train.py`, `src/generate.py` (dan `src/config.py` — format JSON).
 - Konfigurasi: batch size 32, epochs 10, AdamW `lr=3e-4`, `weight_decay=0.01`, seed 42, `CrossEntropyLoss(ignore_index=pad_id)`.
-- Output: metrics ke `outputs/metrics/` (CSV/JSONL), checkpoint + vocab + config.
+- Output: metrics dan checkpoint ke `outputs/metrics/` (metrics format JSONL, ADR-011; checkpoint berisi state dict model + vocab + config).
 
 ## 3. Ruang lingkup
 
@@ -49,7 +49,7 @@ Merakit MiniGPT (decoder-only) dari komponen inti, membangun training loop (Cros
 Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Kerangka dan mock boleh dikerjakan lebih awal, tetapi jangan mengklaim training nyata berhasil sebelum model dan dataset asli terintegrasi.
 
 - [ ] **C1. Periksa kontrak model, dataset, dan training pada `TECH_SPEC.md`.** Baca §5–§7, ADR-004/009; catat antarmuka MiniGPT, loss, konfigurasi training, dan aturan generation. *Hasil:* ringkasan kontrak tertulis di laporan AI.
-- [ ] **C2. Siapkan konfigurasi dan struktur modul.** Buat `src/config.py` bila perlu (JSON/args terpusat) dan kerangka `src/model/minigpt.py`, `src/train.py`, `src/generate.py`. *Hasil:* struktur modul + config siap.
+- [ ] **C2. Siapkan konfigurasi dan struktur modul.** Buat `src/config.py` (format JSON terpusat) dan kerangka `src/model/minigpt.py`, `src/train.py`, `src/generate.py`. *Hasil:* struktur modul + config siap.
 - [ ] **C3. Buat kerangka MiniGPT yang sesuai interface.** Constructor + `forward` sesuai §6, komposisi Embedding → +PE → DecoderBlocks → LayerNorm → Linear, validasi `T > context_length`. *Hasil:* MiniGPT terdefinisi (boleh referensi modul yang belum ada via import kontrak).
 - [ ] **C4. Uji alur model menggunakan mock jika komponen sebenarnya belum tersedia.** Gantikan PE/DecoderBlock dengan stub identitas penjaga shape; pastikan alur `[B, T] -> [B, T, V]` tak runtuh. *Hasil:* test alur mock lulus; jelaskan ini bukan integrasi final.
 - [ ] **C5. Integrasikan token embedding, Positional Encoding, Decoder Block, dan output layer.** Sambungkan komponen asli Issue B (setelah tersedia/lulus) + `nn.Embedding(vocab_size, d_model)` + `Linear(d_model, vocab_size)`. *Hasil:* MiniGPT lengkap terangkai.
@@ -57,7 +57,7 @@ Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Kerangka dan mock
 - [ ] **C7. Siapkan fungsi loss dan satu training step.** `CrossEntropyLoss(ignore_index=pad_id)`, flat `[B*T, V]` vs `[B*T]`; satu langkah forward → loss → `backward()` → `optimizer.step()`. *Hasil:* satu step training berjalan.
 - [ ] **C8. Pastikan parameter berubah setelah optimizer step.** Catat bobot before/after, cek selisih non-nol dan loss finite. *Hasil:* test parameter-update lulus.
 - [ ] **C9. Implementasikan training loop dan validation loss.** Seed 42, batch 32, epochs 10 awal, AdamW `lr=3e-4`, `weight_decay=0.01`; hitung train + validation loss per epoch. *Hasil:* loop + loss per epoch tercatat.
-- [ ] **C10. Implementasikan pencatatan metrik dan checkpoint.** Tulis metrics ke `outputs/metrics/` (CSV/JSONL); checkpoint berisi state dict model + vocab + config, bisa dimuat ulang. *Hasil:* file metrics + checkpoint terverifikasi isinya.
+- [ ] **C10. Implementasikan pencatatan metrik dan checkpoint.** Tulis metrics dan checkpoint ke `outputs/metrics/` (metrics format JSONL, ADR-011; checkpoint berisi state dict model + vocab + config, bisa dimuat ulang). *Hasil:* file metrics + checkpoint terverifikasi isinya.
 - [ ] **C11. Integrasikan data loader nyata setelah Issue #2 siap.** Ganti data dummy dengan tokenizer/dataset/loader asli dari Issue A; verifikasi batch `[B, 64]` dan loss finite. *Hasil:* training memakai data asli.
 - [ ] **C12. Implementasikan greedy text generation.** `generate(prompt, max_new_tokens=64)`: lowercase → encode → prepend `bos_id` → loop argmax → konteks window geser `context_length`. *Hasil:* output `str` terhasilkan dari model terlatih.
 - [ ] **C13. Uji penghentian generation pada EOS dan batas token baru.** Verifikasi berhenti saat `eos_id` dihasilkan ATAU `max_new_tokens` tercapai; uji kedua jalur. *Hasil:* test stop-rule lulus.

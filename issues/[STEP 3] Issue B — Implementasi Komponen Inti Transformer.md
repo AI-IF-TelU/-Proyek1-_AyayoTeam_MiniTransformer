@@ -9,8 +9,8 @@ Implementasi inti Transformer secara manual sesuai kontrak: Sinusoidal Positiona
 ## 2. Konteks teknis dan file terkait
 
 - `docs/TECH_SPEC.md` §2 (batas library), §6 (kontrak model), §7 (kompleksitas); `docs/ARCHITECTURE_DECISIONS.md` ADR-002, ADR-004, ADR-007.
-- File target: `src/model/positional_encoding.py`, `src/model/attention.py`, `src/model/decoder_block.py` (susunan final dikonfirmasi saat integrasi).
-- Konfigurasi baseline: `n_layers=2`, `n_heads=4`, `d_model=64`, `context_length=64`, `ff_dim=256`, dropout `0.1`, LayerNorm epsilon `1e-5`.
+- File target: `src/model/positional_encoding.py`, `src/model/attention.py`, `src/model/decoder_block.py` (susunan final dikonfirmasi koordinator 2026-10-19 — Opsi 1, tetap per kontrak TECH_SPEC §6).
+- Konfigurasi baseline: `n_layers=2`, `n_heads=4`, `d_model=64`, `context_length=64`, `d_ff=256`, dropout `0.1`, LayerNorm epsilon `1e-5`.
 
 ## 3. Ruang lingkup
 
