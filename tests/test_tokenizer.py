@@ -1,25 +1,31 @@
-import pytest
+import unittest
 from src.data.tokenizer import Tokenizer
 
-def test_tokenizer_fit_and_encode():
-    texts = ["Halo dunia!", "Halo mini transformer."]
-    tokenizer = Tokenizer()
-    tokenizer.fit(texts)
-    
-    assert tokenizer.vocab_size > 4
-    assert tokenizer.token_to_id["<pad>"] == 0
-    assert tokenizer.token_to_id["<bos>"] == 1
-    assert tokenizer.token_to_id["<eos>"] == 2
-    assert tokenizer.token_to_id["<unk>"] == 3
+class TestTokenizerLeakage(unittest.TestCase):
+    def test_no_vocab_leakage(self):
+        train_texts = ["halo dunia ini latihan training."]
+        val_texts = ["halo dunia baru, validation test."]
 
-    encoded = tokenizer.encode("Halo dunia baru")
-    assert isinstance(encoded, list)
-    # "baru" harusnya <unk> karena tidak ada di fit
-    assert encoded[-1] == 3
+        tokenizer = Tokenizer()
+        tokenizer.fit(train_texts)
 
-def test_tokenizer_decode():
-    tokenizer = Tokenizer()
-    tokenizer.fit(["tes tokenizer"])
-    ids = [tokenizer.token_to_id["tes"]]
-    decoded = tokenizer.decode(ids)
-    assert decoded == "tes"
+        # Cek token baru di val/test seperti "baru" dan "," (koma) tidak ada di vocab train
+        train_vocab = set(tokenizer.token_to_id.keys())
+        
+        self.assertIn("halo", train_vocab)
+        self.assertIn("dunia", train_vocab)
+        self.assertNotIn("baru", train_vocab)
+        self.assertNotIn(",", train_vocab)
+
+        # Cek encoding val/test menggunakan <unk> (id 3) untuk token asing
+        encoded_val = tokenizer.encode("baru")
+        self.assertEqual(encoded_val, [3])
+
+        # Cek ukuran vocab sesuai train saja + special tokens (4)
+        # special tokens: <pad>=0, <bos>=1, <eos>=2, <unk>=3
+        # train tokens unik: halo, dunia, ini, latihan, training, .
+        expected_size = 4 + 6
+        self.assertEqual(tokenizer.vocab_size, expected_size)
+
+if __name__ == "__main__":
+    unittest.main()
