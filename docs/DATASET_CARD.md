@@ -29,12 +29,13 @@ Repositori mencantumkan lisensi CC BY-NC 4.0. Label kategori dilaporkan dibuat d
 - Model kecil dapat mengulang teks, menghasilkan fakta keliru, atau mempelajari bias korpus.
 - Hasil generation hanya demonstrasi pendidikan, bukan sumber berita tepercaya.
 
-## Catatan eksperimen yang harus diisi
-> Diisi pada langkah dataset (setelah dataset diunduh dan diproses, bukan pada Issue #1).
-- Tanggal akses:
-- Versi/revision dataset:
-- Split asli dan jumlah baris:
-- Filter yang diterapkan:
-- Jumlah artikel train/validation/test:
-- Jumlah token dan ukuran vocabulary:
-- Pemeriksaan lisensi/provenance:
+## Catatan eksperimen aktual
+- **Tanggal akses:** 2026-10-20
+- **Versi/revision dataset:** 13f841935cf1adbe3e41e474bf926e49a0e2943e
+- **Split asli dan jumlah baris:** Subset 1.000 artikel dari split `train`.
+- **Filter yang diterapkan:** Pembuangan konten kosong setelah `strip()`.
+- **Jumlah artikel (Train/Val/Test):** 800 / 100 / 100.
+- **Jumlah token (Train/Val/Test):** 325.788 / 38.240 / 39.752.
+- **Ukuran vocabulary:** 20.514.
+- **Padding (Train):** ~0.00% pada training set (64 context length).
+- **Pemeriksaan lisensi:** CC BY-NC 4.0 terkonfirmasi pada metadata unduhan.
