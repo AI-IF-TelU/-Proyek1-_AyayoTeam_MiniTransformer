@@ -43,14 +43,8 @@ def test_no_cross_document_leak():
 
 def test_empty_and_short_docs():
     tokenizer = Tokenizer()
-    tokenizer.fit(["a"])
+    tokenizer.fit(["a", "b"])
 
+    # "" (0 tokens -> 0 pairs) dan "a" (1 token -> 0 pairs) harus dibuang
     dataset = TextDataset(["", "a"], tokenizer, context_length=64)
-    assert len(dataset) == 1
-    x, y = dataset[0]
-    bos_id = tokenizer.special_tokens["<bos>"]
-    eos_id = tokenizer.special_tokens["<eos>"]
-    a_id = tokenizer.encode("a")[0]
-
-    assert x.tolist() == [bos_id, a_id]
-    assert y.tolist() == [a_id, eos_id]
+    assert len(dataset) == 0

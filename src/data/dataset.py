@@ -46,7 +46,9 @@ class TextDataset(Dataset):
             if not token_ids:
                 continue
             full_ids = add_bos_eos(token_ids, bos_id=bos_id, eos_id=eos_id)
-            if len(full_ids) < 2:
+            # Dokumen 1 token menghasilkan len(full_ids) == 3 ([bos, token, eos])
+            # TECH_SPEC.md §4: dokumen 1 token TIDAK menghasilkan pasangan.
+            if len(full_ids) < 4:
                 continue
 
             if len(full_ids) >= window_size:

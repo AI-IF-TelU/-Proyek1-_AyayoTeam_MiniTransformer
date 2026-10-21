@@ -1,7 +1,7 @@
 """Process dataset: deduplicate and perform document-level splitting.
 
 Input: data/raw/indonesian_news_1000.jsonl
-Output: data/processed/train.jsonl, val.jsonl, test.jsonl
+Output: data/processed/train.jsonl, val.jsonl
 """
 
 import json
@@ -47,12 +47,10 @@ def process_and_split():
     random.seed(SEED)
     random.shuffle(documents)
 
-    train_end = int(total_docs * 0.8)
-    val_end = train_end + int(total_docs * 0.1)
-
-    train_docs = documents[:train_end]
-    val_docs = documents[train_end:val_end]
-    test_docs = documents[val_end:]
+    # Split: 90% train, 10% validation from train split (no test carved from train)
+    val_count = int(total_docs * 0.1)
+    val_docs = documents[:val_count]
+    train_docs = documents[val_count:]
 
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -63,13 +61,11 @@ def process_and_split():
 
     write_jsonl(PROCESSED_DIR / "train.jsonl", train_docs)
     write_jsonl(PROCESSED_DIR / "val.jsonl", val_docs)
-    write_jsonl(PROCESSED_DIR / "test.jsonl", test_docs)
 
     stats = {
         "total_unique_docs": total_docs,
         "train_docs": len(train_docs),
         "val_docs": len(val_docs),
-        "test_docs": len(test_docs),
     }
 
     print(json.dumps(stats, indent=2))

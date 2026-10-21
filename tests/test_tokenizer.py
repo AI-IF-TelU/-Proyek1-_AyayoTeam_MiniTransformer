@@ -1,6 +1,29 @@
 import unittest
 from src.data.tokenizer import Tokenizer
 
+class TestTokenizerBasic(unittest.TestCase):
+    def setUp(self):
+        self.tokenizer = Tokenizer()
+        self.tokenizer.fit(["halo dunia 123!!!"])
+
+    def test_tokenizer_basic(self):
+        # Test lowercase, splitting using encode or checking encode behavior
+        encoded = self.tokenizer.encode("Halo Dunia")
+        # Since 'halo' and 'dunia' are in vocab, they shouldn't be unk (3)
+        self.assertNotIn(3, encoded)
+        self.assertEqual(len(encoded), 2)
+
+    def test_tokenizer_special_chars(self):
+        # Test symbols and digits
+        encoded = self.tokenizer.encode("!!! 123")
+        self.assertNotIn(3, encoded)
+        self.assertEqual(len(encoded), 4)
+
+    def test_tokenizer_unknown(self):
+        # Test <unk> fallback
+        encoded = self.tokenizer.encode("xyz")
+        self.assertEqual(encoded, [3]) # <unk> id is 3
+
 class TestTokenizerLeakage(unittest.TestCase):
     def test_no_vocab_leakage(self):
         train_texts = ["halo dunia ini latihan training."]
