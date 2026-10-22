@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from src.model.attention import CausalMultiHeadAttention
+
 
 class FeedForward(nn.Module):
     """Position-wise Feed-Forward Network dengan GELU per TECH_SPEC 6 / ADR-007.
@@ -61,6 +63,39 @@ class DecoderBlock(nn.Module):
         pre_norm: bool = True,
     ) -> None:
         super().__init__()
+        if d_model <= 0 or d_ff <= 0:
+            raise ValueError(
+                f"d_model ({d_model}) and d_ff ({d_ff}) must be positive"
+            )
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.d_ff = d_ff
+        self.dropout = dropout
+        self.layer_norm_eps = layer_norm_eps
+        self.pre_norm = pre_norm
+        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps)
+        self.attn = CausalMultiHeadAttention(d_model, n_heads, dropout)
+        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps)
+        self.ffn = FeedForward(d_model, d_ff, dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("implemented in subtasks B10-B11")
+        """x: [B, T, d_model] -> [B, T, d_model].
+
+        - pre-norm: `x + CausalMHA(LayerNorm(x))`, `x + FFN(LayerNorm(x))`;
+        - post-norm: `LayerNorm(x + CausalMHA(x))`, `LayerNorm(x + FFN(x))`.
+        """
+        if x.dim() != 3:
+            raise ValueError(
+                f"expected 3D input [B, T, d_model], got {x.dim()}D"
+            )
+        if x.size(-1) != self.d_model:
+            raise ValueError(
+                f"expected last dim {self.d_model}, got {x.size(-1)}"
+            )
+        if self.pre_norm:
+            x = x + self.attn(self.norm1(x))
+            x = x + self.ffn(self.norm2(x))
+        else:
+            x = self.norm1(x + self.attn(x))
+            x = self.norm2(x + self.ffn(x))
+        return x

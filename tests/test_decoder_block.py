@@ -73,14 +73,26 @@ class TestFeedForward(unittest.TestCase):
             ffn(torch.randn(B, T, D_MODEL - 1))
 
 
-@unittest.skip("skeleton B2; prediction dijalankan di B12")
 class TestDecoderBlockShape(unittest.TestCase):
     def test_output_shape(self):
         block = DecoderBlock(D_MODEL, N_HEADS, D_FF)
         _assert_shape(block(torch.randn(B, T, D_MODEL)), (B, T, D_MODEL))
 
+    def test_output_shape_varied_batch_and_length(self):
+        block = DecoderBlock(D_MODEL, N_HEADS, D_FF)
+        block.eval()
+        for batch, length in ((1, 1), (4, 16), (B, T)):
+            x = torch.randn(batch, length, D_MODEL)
+            _assert_shape(block(x), (batch, length, D_MODEL))
 
-@unittest.skip("skeleton B2; prediction dijalankan di B12")
+    def test_value_error_on_wrong_input(self):
+        block = DecoderBlock(D_MODEL, N_HEADS, D_FF)
+        with self.assertRaises(ValueError):
+            block(torch.randn(B, D_MODEL))
+        with self.assertRaises(ValueError):
+            block(torch.randn(B, T, D_MODEL - 1))
+
+
 class TestResidualConnection(unittest.TestCase):
     def test_output_differs_from_input(self):
         block = DecoderBlock(D_MODEL, N_HEADS, D_FF, dropout=DROPOUT)
@@ -89,8 +101,26 @@ class TestResidualConnection(unittest.TestCase):
         out = block(x)
         self.assertFalse(torch.allclose(out, x, atol=1e-6, rtol=1e-6))
 
+    def test_pre_norm_matches_manual_residual_computation(self):
+        block = DecoderBlock(D_MODEL, N_HEADS, D_FF, dropout=0.0)
+        block.eval()
+        x = torch.randn(B, T, D_MODEL)
+        a = block.attn(block.norm1(x))
+        expected = x + a + block.ffn(block.norm2(x + a))
+        torch.testing.assert_close(block(x), expected, atol=1e-6, rtol=1e-6)
 
-@unittest.skip("skeleton B2; prediction dijalankan di B12")
+    def test_post_norm_matches_manual_computation(self):
+        block = DecoderBlock(
+            D_MODEL, N_HEADS, D_FF, dropout=0.0, pre_norm=False
+        )
+        block.eval()
+        x = torch.randn(B, T, D_MODEL)
+        a = block.attn(x)
+        h = block.norm1(x + a)
+        expected = block.norm2(h + block.ffn(h))
+        torch.testing.assert_close(block(x), expected, atol=1e-6, rtol=1e-6)
+
+
 class TestDropoutBehavior(unittest.TestCase):
     def test_train_differs_from_eval(self):
         block = DecoderBlock(D_MODEL, N_HEADS, D_FF, dropout=DROPOUT)
