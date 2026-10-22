@@ -30,12 +30,13 @@ Repositori mencantumkan lisensi CC BY-NC 4.0. Label kategori dilaporkan dibuat d
 - Hasil generation hanya demonstrasi pendidikan, bukan sumber berita tepercaya.
 
 ## Catatan eksperimen aktual
-- **Tanggal akses:** 2026-10-22
+- **Tanggal akses:** 2026-10-22 (test diunduh ulang 2026-10-22; unduhan pertama gagal 429 dan menghasilkan data tidak valid).
 - **Versi/revision dataset:** 13f841935cf1adbe3e41e474bf926e49a0e2943e
-- **Split asli dan jumlah baris:** 800 artikel dari `train` split, 200 artikel dari `test` split.
-- **Filter yang diterapkan:** Pembuangan konten kosong, deduplikasi per split, dedup lintas split.
-- **Jumlah artikel (Train/Val/Test):** 720 / 80 / 100.
-- **Jumlah token (Train/Val/Test):** 290.920 / 33.157 / 39.552.
+- **Split asli dan jumlah baris:** 800 artikel dari `train` split, 200 artikel dari `test` split (test saat ini 200 baris unik, bukan duplikat 100 doc × 2).
+- **Filter yang diterapkan:** Pembuangan konten kosong, deduplikasi per split, dedup lintas split (hasil `process_and_split.py`: `cross_split_dropped=0`).
+- **Jumlah artikel (Train/Val/Test):** 720 / 80 / 200.
+- **Definisi "jumlah token":** total panjang hasil `Tokenizer.encode()` (regex `\w+|[^\w\s]`, lowercase) per dokumen, dijumlahkan per split; **tidak termasuk** id `<bos>`/`<eos>` yang disisipkan pada tahap dataset (TECH_SPEC §4). Dengan bos/eos totalnya lebih besar 2×jumlah dokumen.
+- **Jumlah token (Train/Val/Test):** 290.920 / 33.157 / 77.330.
 - **Ukuran vocabulary:** 19.192.
 - **Padding (Train):** 0.00% pada training set (64 context length).
 - **Pemeriksaan lisensi:** CC BY-NC 4.0 terkonfirmasi pada metadata unduhan.
