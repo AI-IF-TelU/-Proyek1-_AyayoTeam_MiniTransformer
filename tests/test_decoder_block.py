@@ -135,8 +135,15 @@ class TestDropoutBehavior(unittest.TestCase):
         torch.testing.assert_close(out_eval_a, out_eval_b, atol=1e-6, rtol=1e-6)
 
 
-@unittest.skip("skeleton B2; prediction dijalankan di B12")
 class TestGradients(unittest.TestCase):
+    def test_forward_backward_runs_and_shape(self):
+        block = DecoderBlock(D_MODEL, N_HEADS, D_FF, dropout=0.0)
+        x = torch.randn(B, T, D_MODEL)
+        out = block(x)
+        _assert_shape(out, (B, T, D_MODEL))
+        loss = out.sum()
+        loss.backward()
+
     def test_gradients_flow_to_all_parameters(self):
         block = DecoderBlock(D_MODEL, N_HEADS, D_FF)
         x = torch.randn(B, T, D_MODEL)
@@ -144,7 +151,36 @@ class TestGradients(unittest.TestCase):
         loss.backward()
         for name, param in block.named_parameters():
             self.assertIsNotNone(param.grad, f"param {name} has None gradient")
-            self.assertTrue(torch.count_nonzero(param.grad) > 0, f"param {name} grad zero")
+            self.assertTrue(
+                torch.count_nonzero(param.grad) > 0, f"param {name} grad zero"
+            )
+
+    def test_gradients_flow_grouped_by_submodule(self):
+        block = DecoderBlock(D_MODEL, N_HEADS, D_FF)
+        x = torch.randn(B, T, D_MODEL)
+        loss = block(x).sum()
+        loss.backward()
+        for submodule_name in ("norm1", "attn", "norm2", "ffn"):
+            submodule = getattr(block, submodule_name)
+            params = list(submodule.named_parameters())
+            self.assertTrue(params, f"{submodule_name} has no parameters")
+            for name, param in params:
+                full_name = f"{submodule_name}.{name}"
+                self.assertIsNotNone(
+                    param.grad, f"param {full_name} has None gradient"
+                )
+                self.assertTrue(
+                    torch.count_nonzero(param.grad) > 0,
+                    f"param {full_name} grad zero",
+                )
+
+    def test_input_gradient_not_none(self):
+        block = DecoderBlock(D_MODEL, N_HEADS, D_FF, dropout=0.0)
+        x = torch.randn(B, T, D_MODEL, requires_grad=True)
+        out = block(x)
+        out.sum().backward()
+        self.assertIsNotNone(x.grad)
+        self.assertTrue(torch.count_nonzero(x.grad) > 0)
 
 
 if __name__ == "__main__":
