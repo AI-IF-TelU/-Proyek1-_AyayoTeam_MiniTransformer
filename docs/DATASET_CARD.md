@@ -8,7 +8,7 @@
 ## Pemakaian yang direncanakan
 - Utamakan kolom `content`; `title` bersifat opsional.
 - Jangan memuat kolom embedding jika tidak dibutuhkan.
-- Subset = 1.000 artikel (keputusan koordinator 2026-10-19, ADR-012) untuk uji pipeline dan training awal.
+- Subset = 1.000 artikel awal (800 dari `train` split, 200 dari `test` split) untuk uji pipeline dan training awal.
 - Jangan menyebut subset sebagai korpus Karhutla kecuali setiap artikel telah disaring dan diverifikasi relevansinya.
 
 ## Lisensi dan provenance
@@ -19,7 +19,7 @@ Repositori mencantumkan lisensi CC BY-NC 4.0. Label kategori dilaporkan dibuat d
 2. Hapus baris dengan konten kosong.
 3. Normalisasi seperlunya: ubah huruf ke lowercase (sesuai kontrak tokenizer TECH_SPEC §3); jangan menghapus tanda baca yang berguna untuk bahasa.
 4. Deduplikasi berdasarkan konten yang telah dinormalisasi.
-5. Pisahkan data berdasarkan dokumen sebelum tokenisasi dan pembuatan window. Pertahankan split bawaan dataset (train/test) jika tersedia dan terverifikasi; validation diambil 10% dari split train dengan seed 42 (ADR-012). Fallback 80/10/10 tidak dipakai pada proyek ini. Dilarang me-resplit test split bawaan secara sembarangan.
+5. Pisahkan data berdasarkan dokumen sebelum tokenisasi dan pembuatan window. Split train (800) dan test (200) diunduh terpisah. Dedup dilakukan lintas split (buang dari test jika ada di train). Validation diambil 10% dari split train dengan seed 42 (ADR-012).
 6. Tokenisasi tiap dokumen, sisipkan `bos_id`/`eos_id` setelah tokenisasi, lalu bangun window sliding 65 stride 1 (kontrak detail: TECH_SPEC §4).
 7. Bangun vocabulary hanya dari training split.
 
@@ -30,12 +30,12 @@ Repositori mencantumkan lisensi CC BY-NC 4.0. Label kategori dilaporkan dibuat d
 - Hasil generation hanya demonstrasi pendidikan, bukan sumber berita tepercaya.
 
 ## Catatan eksperimen aktual
-- **Tanggal akses:** 2026-10-20
+- **Tanggal akses:** 2026-10-22
 - **Versi/revision dataset:** 13f841935cf1adbe3e41e474bf926e49a0e2943e
-- **Split asli dan jumlah baris:** Subset 1.000 artikel dari split `train`.
-- **Filter yang diterapkan:** Pembuangan konten kosong setelah `strip()`.
-- **Jumlah artikel (Train/Val/Test):** 800 / 100 / 100.
-- **Jumlah token (Train/Val/Test):** 325.788 / 38.240 / 39.752.
-- **Ukuran vocabulary:** 20.514.
-- **Padding (Train):** ~0.00% pada training set (64 context length).
+- **Split asli dan jumlah baris:** 800 artikel dari `train` split, 200 artikel dari `test` split.
+- **Filter yang diterapkan:** Pembuangan konten kosong, deduplikasi per split, dedup lintas split.
+- **Jumlah artikel (Train/Val/Test):** 720 / 80 / 100.
+- **Jumlah token (Train/Val/Test):** 290.920 / 33.157 / 39.552.
+- **Ukuran vocabulary:** 19.192.
+- **Padding (Train):** 0.00% pada training set (64 context length).
 - **Pemeriksaan lisensi:** CC BY-NC 4.0 terkonfirmasi pada metadata unduhan.

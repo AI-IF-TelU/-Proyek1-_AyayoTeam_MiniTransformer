@@ -11,15 +11,13 @@ def test_normalize_text():
 def test_splits_and_leakage():
     stats = process_and_split()
     
-    total = stats["total_unique_docs"]
     train_len = stats["train_docs"]
     val_len = stats["val_docs"]
+    test_len = stats["test_docs"]
 
-    # Test splitting counts (90% train, 10% val)
-    assert total == train_len + val_len
-    assert val_len == int(total * 0.1)
-    assert train_len == total - val_len
-
+    # Val = 10% dari train (720 train / 80 val)
+    assert val_len == int(train_len + val_len) * 0.1
+    
     # Test no leakage across files
     def load_contents(file_path: Path):
         contents = set()
@@ -32,8 +30,12 @@ def test_splits_and_leakage():
 
     train_set = load_contents(PROCESSED_DIR / "train.jsonl")
     val_set = load_contents(PROCESSED_DIR / "val.jsonl")
+    test_set = load_contents(PROCESSED_DIR / "test.jsonl")
 
     assert len(train_set) == train_len
     assert len(val_set) == val_len
+    assert len(test_set) == test_len
 
     assert len(train_set.intersection(val_set)) == 0
+    assert len(train_set.intersection(test_set)) == 0
+    assert len(val_set.intersection(test_set)) == 0

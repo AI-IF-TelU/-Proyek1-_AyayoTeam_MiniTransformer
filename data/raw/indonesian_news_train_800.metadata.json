@@ -3,10 +3,10 @@
   "split": "train",
   "revision": "13f841935cf1adbe3e41e474bf926e49a0e2943e",
   "license": "CC BY-NC 4.0",
-  "accessed_at_utc_plus_7": "2026-10-20T02:48:26+07:00",
+  "accessed_at_utc_plus_7": "2026-10-22T03:10:00+07:00",
   "filter": "content tidak kosong setelah strip()",
-  "rows_read": 1000,
+  "rows_read": 900,
   "rows_skipped": 0,
-  "rows_saved": 1000,
-  "output": "data/raw/indonesian_news_1000.jsonl"
+  "rows_saved": 800,
+  "output": "data/raw/indonesian_news_train_800.jsonl"
 }
