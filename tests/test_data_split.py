@@ -16,7 +16,7 @@ def test_splits_and_leakage():
     test_len = stats["test_docs"]
 
     # Val = 10% dari train (720 train / 80 val)
-    assert val_len == int(train_len + val_len) * 0.1
+    assert val_len == int((train_len + val_len) * 0.1)
     
     # Test no leakage across files
     def load_contents(file_path: Path):
