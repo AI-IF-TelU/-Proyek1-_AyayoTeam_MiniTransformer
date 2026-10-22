@@ -2,6 +2,43 @@ import torch
 import torch.nn as nn
 
 
+class FeedForward(nn.Module):
+    """Position-wise Feed-Forward Network dengan GELU per TECH_SPEC 6 / ADR-007.
+
+    - Kontrak:
+    - `Linear(d_model, d_ff)` -> GELU -> `Linear(d_ff, d_model)` -> dropout;
+    - baseline `d_ff = 4 * d_model = 256`, dropout `0.1`;
+    - `forward(x: [B, T, d_model]) -> [B, T, d_model]`, identik per posisi;
+    - `d_model <= 0` atau `d_ff <= 0` -> `ValueError` saat inisialisasi.
+    """
+
+    def __init__(self, d_model: int, d_ff: int, dropout: float = 0.1) -> None:
+        super().__init__()
+        if d_model <= 0 or d_ff <= 0:
+            raise ValueError(
+                f"d_model ({d_model}) and d_ff ({d_ff}) must be positive"
+            )
+        self.d_model = d_model
+        self.d_ff = d_ff
+        self.dropout = dropout
+        self.fc1 = nn.Linear(d_model, d_ff)
+        self.activation = nn.GELU()
+        self.fc2 = nn.Linear(d_ff, d_model)
+        self.drop = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """x: [B, T, d_model] -> [B, T, d_model]."""
+        if x.dim() != 3:
+            raise ValueError(
+                f"expected 3D input [B, T, d_model], got {x.dim()}D"
+            )
+        if x.size(-1) != self.d_model:
+            raise ValueError(
+                f"expected last dim {self.d_model}, got {x.size(-1)}"
+            )
+        return self.drop(self.fc2(self.activation(self.fc1(x))))
+
+
 class DecoderBlock(nn.Module):
     """Pre-LayerNorm decoder block per TECH_SPEC 6 / ADR-007.
 
