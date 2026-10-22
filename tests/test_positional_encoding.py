@@ -1,3 +1,4 @@
+import math
 import unittest
 
 import torch
@@ -16,11 +17,14 @@ def _assert_shape(tensor: torch.Tensor, expected: tuple) -> None:
 
 def _expected_pe(d_model: int, max_len: int) -> torch.Tensor:
     positions = torch.arange(max_len, dtype=torch.float32).unsqueeze(1)
-    dims = torch.arange(d_model, dtype=torch.float32).unsqueeze(0)
-    angles = positions / (10000.0 ** (dims / d_model))
+    div_term = torch.exp(
+        torch.arange(0, d_model, 2, dtype=torch.float32)
+        * (-math.log(10000.0) / d_model)
+    )
+    angles = positions * div_term
     pe = torch.zeros(max_len, d_model)
-    pe[:, 0::2] = torch.sin(angles[:, 0::2])
-    pe[:, 1::2] = torch.cos(angles[:, 1::2])
+    pe[:, 0::2] = torch.sin(angles)
+    pe[:, 1::2] = torch.cos(angles)
     return pe
 
 
@@ -42,11 +46,49 @@ class TestPositionalEncoding(unittest.TestCase):
         expected = _expected_pe(D_MODEL, MAX_LEN)
         torch.testing.assert_close(buffer, expected, atol=1e-6, rtol=1e-6)
 
+    def test_matches_standard_sinusoid_formula(self):
+        buffer = self.pe.get_buffer("pe")
+        positions = torch.arange(MAX_LEN, dtype=torch.float32).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, D_MODEL, 2, dtype=torch.float32)
+            * (-math.log(10000.0) / D_MODEL)
+        )
+        reference = torch.zeros(MAX_LEN, D_MODEL)
+        reference[:, 0::2] = torch.sin(positions * div_term)
+        reference[:, 1::2] = torch.cos(positions * div_term)
+        torch.testing.assert_close(buffer, reference, atol=1e-6, rtol=1e-6)
+
+    def test_even_odd_pair_share_frequency(self):
+        buffer = self.pe.get_buffer("pe")
+        positions = torch.arange(MAX_LEN, dtype=torch.float32)
+        div_term = torch.exp(
+            torch.arange(0, D_MODEL, 2, dtype=torch.float32)
+            * (-math.log(10000.0) / D_MODEL)
+        )
+        for i, k in enumerate(range(0, D_MODEL, 2)):
+            angle = positions * div_term[i]
+            torch.testing.assert_close(
+                buffer[:, k], torch.sin(angle), atol=1e-6, rtol=1e-5
+            )
+            torch.testing.assert_close(
+                buffer[:, k + 1], torch.cos(angle), atol=1e-6, rtol=1e-5
+            )
+
     def test_value_error_when_T_exceeds_max_len(self):
         pe = SinCosPositionalEncoding(D_MODEL, max_len=4)
         x = torch.randn(B, 8, D_MODEL)
         with self.assertRaises(ValueError):
             pe(x)
+
+    def test_value_error_when_d_model_odd(self):
+        with self.assertRaises(ValueError):
+            SinCosPositionalEncoding(63, 4)
+        with self.assertRaises(ValueError):
+            SinCosPositionalEncoding(65, 4)
+
+    def test_even_d_model_still_works(self):
+        pe = SinCosPositionalEncoding(64, 4)
+        _assert_shape(pe.get_buffer("pe"), (4, 64))
 
     def test_t_equals_max_len(self):
         pe = SinCosPositionalEncoding(D_MODEL, max_len=4)

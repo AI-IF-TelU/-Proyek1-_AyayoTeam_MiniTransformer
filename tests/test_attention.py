@@ -119,10 +119,12 @@ class TestScaledDotProductAttention(unittest.TestCase):
         attn.train()
         out_train_a = attn._scaled_dot_product_attention(q, k, v)
         out_train_b = attn._scaled_dot_product_attention(q, k, v)
+        self.assertTrue(torch.isfinite(out_train_a).all())
+        self.assertTrue(torch.isfinite(out_train_b).all())
+        self.assertFalse(torch.allclose(out_train_a, out_train_b))
         attn.eval()
         out_eval_a = attn._scaled_dot_product_attention(q, k, v)
         out_eval_b = attn._scaled_dot_product_attention(q, k, v)
-        self.assertFalse(torch.allclose(out_train_a, out_train_b))
         torch.testing.assert_close(out_eval_a, out_eval_b, atol=1e-6, rtol=1e-6)
 
 
@@ -245,6 +247,63 @@ class TestDropoutBehavior(unittest.TestCase):
         out_eval_b = attn(x)
         self.assertFalse(torch.allclose(out_train_a, out_train_b))
         torch.testing.assert_close(out_eval_a, out_eval_b, atol=1e-6, rtol=1e-6)
+
+
+class TestTrainModeDropoutSafety(unittest.TestCase):
+    def setUp(self):
+        self.attn = CausalMultiHeadAttention(D_MODEL, N_HEADS, dropout=DROPOUT)
+        self.attn.train()
+
+    def test_train_mode_output_is_finite(self):
+        for seed in range(5):
+            torch.manual_seed(seed)
+            x = torch.randn(B, T, D_MODEL)
+            out = self.attn(x)
+            self.assertTrue(
+                torch.isfinite(out).all(), f"non-finite output under seed {seed}"
+            )
+
+    def test_causal_invariance_holds_in_train_mode(self):
+        q = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        k = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        v = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        mask = self.attn._causal_mask(T)
+
+        torch.manual_seed(0)
+        out_a = self.attn._scaled_dot_product_attention(q, k, v, mask)
+
+        q_future = q.clone()
+        k_future = k.clone()
+        v_future = v.clone()
+        q_future[:, :, T // 2 :, :] = torch.randn_like(q_future[:, :, T // 2 :, :])
+        k_future[:, :, T // 2 :, :] = torch.randn_like(k_future[:, :, T // 2 :, :])
+        v_future[:, :, T // 2 :, :] = torch.randn_like(v_future[:, :, T // 2 :, :])
+
+        torch.manual_seed(0)
+        out_b = self.attn._scaled_dot_product_attention(q_future, k_future, v_future, mask)
+
+        self.assertTrue(torch.isfinite(out_a).all())
+        self.assertTrue(torch.isfinite(out_b).all())
+        torch.testing.assert_close(
+            out_a[:, :, : T // 2, :], out_b[:, :, : T // 2, :], atol=1e-6, rtol=1e-6
+        )
+        self.assertFalse(
+            torch.allclose(out_a[:, :, T // 2 :, :], out_b[:, :, T // 2 :, :])
+        )
+
+    def test_masked_future_scores_never_nan(self):
+        q = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        k = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        scale = HEAD_DIM ** -0.5
+        scores = q @ k.transpose(-2, -1) * scale
+        mask = self.attn._causal_mask(T)
+        torch.manual_seed(0)
+        scores = self.attn.attn_dropout(scores)
+        scores = scores + mask
+        upper = torch.triu(torch.ones(T, T, dtype=torch.bool), diagonal=1)
+        future_scores = scores[:, :, upper]
+        self.assertFalse(torch.isnan(future_scores).any())
+        self.assertTrue(torch.isneginf(future_scores).all())
 
 
 if __name__ == "__main__":

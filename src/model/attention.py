@@ -85,9 +85,9 @@ class CausalMultiHeadAttention(nn.Module):
                 )
         scale = 1.0 / math.sqrt(self.head_dim)
         scores = q @ k.transpose(-2, -1) * scale  # [B, H, T, T]
+        scores = self.attn_dropout(scores)
         if mask is not None:
             scores = scores + mask
-        scores = self.attn_dropout(scores)
         probs = torch.softmax(scores, dim=-1)  # [B, H, T, T]
         return probs @ v  # [B, H, T, head_dim]
 
