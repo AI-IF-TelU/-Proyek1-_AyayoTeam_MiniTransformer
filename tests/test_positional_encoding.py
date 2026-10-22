@@ -24,7 +24,6 @@ def _expected_pe(d_model: int, max_len: int) -> torch.Tensor:
     return pe
 
 
-@unittest.skip("skeleton B2; prediction dijalankan di B4")
 class TestPositionalEncoding(unittest.TestCase):
     def setUp(self):
         self.pe = SinCosPositionalEncoding(D_MODEL, MAX_LEN)
@@ -48,6 +47,17 @@ class TestPositionalEncoding(unittest.TestCase):
         x = torch.randn(B, 8, D_MODEL)
         with self.assertRaises(ValueError):
             pe(x)
+
+    def test_t_equals_max_len(self):
+        pe = SinCosPositionalEncoding(D_MODEL, max_len=4)
+        x = torch.randn(B, 4, D_MODEL)
+        _assert_shape(pe(x), (B, 4, D_MODEL))
+
+    def test_additive_semantics(self):
+        x = torch.randn(B, T, D_MODEL)
+        out = self.pe(x)
+        expected = x + self.pe.get_buffer("pe")[:T]
+        torch.testing.assert_close(out, expected, atol=1e-7, rtol=1e-7)
 
 
 if __name__ == "__main__":
