@@ -126,18 +126,46 @@ class TestScaledDotProductAttention(unittest.TestCase):
         torch.testing.assert_close(out_eval_a, out_eval_b, atol=1e-6, rtol=1e-6)
 
 
-@unittest.skip("skeleton B2; prediction dijalankan di B9")
 class TestAttentionShape(unittest.TestCase):
     def test_output_shape(self):
         attn = CausalMultiHeadAttention(D_MODEL, N_HEADS)
         _assert_shape(attn(torch.randn(B, T, D_MODEL)), (B, T, D_MODEL))
 
+    def test_output_shape_varied_batch_and_length(self):
+        attn = CausalMultiHeadAttention(D_MODEL, N_HEADS)
+        attn.eval()
+        for batch, length in ((1, 1), (4, 16), (B, T)):
+            x = torch.randn(batch, length, D_MODEL)
+            _assert_shape(attn(x), (batch, length, D_MODEL))
 
-@unittest.skip("skeleton B2; prediction dijalankan di B9")
+    def test_output_is_float32(self):
+        attn = CausalMultiHeadAttention(D_MODEL, N_HEADS)
+        out = attn(torch.randn(B, T, D_MODEL))
+        self.assertEqual(out.dtype, torch.float32)
+
+    def test_gradient_flows_end_to_end(self):
+        attn = CausalMultiHeadAttention(D_MODEL, N_HEADS, dropout=0.0)
+        x = torch.randn(B, T, D_MODEL, requires_grad=True)
+        out = attn(x)
+        out.sum().backward()
+        for name in ("w_q", "w_k", "w_v", "w_o"):
+            grad = getattr(attn, name).weight.grad
+            self.assertIsNotNone(grad)
+            self.assertFalse(torch.allclose(grad, torch.zeros_like(grad)))
+
+
 class TestAttentionValidation(unittest.TestCase):
     def test_value_error_when_heads_do_not_divide(self):
         with self.assertRaises(ValueError):
             CausalMultiHeadAttention(D_MODEL, n_heads=5)
+
+    def test_value_error_when_zero_heads(self):
+        with self.assertRaises(ValueError):
+            CausalMultiHeadAttention(D_MODEL, n_heads=0)
+
+    def test_value_error_when_more_heads_than_d_model(self):
+        with self.assertRaises(ValueError):
+            CausalMultiHeadAttention(D_MODEL, n_heads=D_MODEL + 1)
 
 
 class TestCausalMask(unittest.TestCase):
@@ -205,7 +233,6 @@ class TestCausalMask(unittest.TestCase):
         )
 
 
-@unittest.skip("skeleton B2; prediction dijalankan di B9")
 class TestDropoutBehavior(unittest.TestCase):
     def test_train_differs_from_eval(self):
         attn = CausalMultiHeadAttention(D_MODEL, N_HEADS, dropout=DROPOUT)
