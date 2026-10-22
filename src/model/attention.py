@@ -28,6 +28,7 @@ class CausalMultiHeadAttention(nn.Module):
         self.head_dim = d_model // n_heads
         self.dropout = dropout
         self.attn_dropout = nn.Dropout(dropout)
+        self.out_dropout = nn.Dropout(dropout)
         self.w_q = nn.Linear(d_model, d_model)
         self.w_k = nn.Linear(d_model, d_model)
         self.w_v = nn.Linear(d_model, d_model)
@@ -91,4 +92,27 @@ class CausalMultiHeadAttention(nn.Module):
         return probs @ v  # [B, H, T, head_dim]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("implemented in subtasks B6-B8")
+        """x: [B, T, d_model] -> [B, T, d_model] (subtasks B5-B8).
+
+        Alur: proyeksi Q/K/V -> split [B, H, T, head_dim] ->
+        scaled dot-product attention dgn causal mask -> gabung head ->
+        output projection `W_o` -> dropout output attention.
+        """
+        if x.dim() != 3:
+            raise ValueError(
+                f"expected 3D input [B, T, d_model], got {x.dim()}D"
+            )
+        if x.size(-1) != self.d_model:
+            raise ValueError(
+                f"expected last dim {self.d_model}, got {x.size(-1)}"
+            )
+        b, t, d = x.size()
+        q, k, v = self._project_qkv(x)  # masing-masing [B, T, d_model]
+        q = q.view(b, t, self.n_heads, self.head_dim).transpose(1, 2)
+        k = k.view(b, t, self.n_heads, self.head_dim).transpose(1, 2)
+        v = v.view(b, t, self.n_heads, self.head_dim).transpose(1, 2)
+        mask = self._causal_mask(t, device=x.device, dtype=x.dtype)
+        attn_out = self._scaled_dot_product_attention(q, k, v, mask)  # [B, H, T, d/H]
+        attn_out = attn_out.transpose(1, 2).contiguous().view(b, t, d)
+        out = self.w_o(attn_out)  # output projection [B, T, d_model]
+        return self.out_dropout(out)
