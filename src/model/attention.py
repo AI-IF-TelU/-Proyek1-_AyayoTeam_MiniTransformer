@@ -39,6 +39,24 @@ class CausalMultiHeadAttention(nn.Module):
         """x: [B, T, d_model] -> q, k, v: [B, T, d_model]."""
         return self.w_q(x), self.w_k(x), self.w_v(x)
 
+    def _causal_mask(
+        self,
+        t: int,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> torch.Tensor:
+        """Additive causal mask: `-inf` strictly above the diagonal.
+
+        Returns `[1, 1, T, T]`, broadcast-compatible with scores
+        `[B, H, T, T]`. Position `i` may attend to `j <= i` only;
+        `T = 1` yields a single zero (no future positions).
+        """
+        idx = torch.arange(t, device=device)
+        mask = torch.where(idx[None, :] > idx[:, None], float("-inf"), 0.0)
+        if dtype is not None:
+            mask = mask.to(dtype)
+        return mask.view(1, 1, t, t)
+
     def _scaled_dot_product_attention(
         self,
         q: torch.Tensor,

@@ -140,18 +140,68 @@ class TestAttentionValidation(unittest.TestCase):
             CausalMultiHeadAttention(D_MODEL, n_heads=5)
 
 
-@unittest.skip("skeleton B2; prediction dijalankan di B9")
-class TestCausalInvariance(unittest.TestCase):
-    def test_future_positions_do_not_change_past_output(self):
-        attn = CausalMultiHeadAttention(D_MODEL, N_HEADS, dropout=DROPOUT)
-        attn.eval()
-        x = torch.randn(B, T, D_MODEL)
-        out_a = attn(x)
-        x_future = x.clone()
-        x_future[:, T // 2 :, :] = torch.randn_like(x_future[:, T // 2 :, :])
-        out_b = attn(x_future)
+class TestCausalMask(unittest.TestCase):
+    def setUp(self):
+        self.attn = CausalMultiHeadAttention(D_MODEL, N_HEADS, dropout=0.0)
+
+    def test_mask_shape(self):
+        mask = self.attn._causal_mask(T)
+        _assert_shape(mask, (1, 1, T, T))
+
+    def test_mask_is_upper_triangular_negative_infinity(self):
+        mask = self.attn._causal_mask(T)[0, 0]
+        for i in range(T):
+            for j in range(T):
+                if j > i:
+                    self.assertEqual(mask[i, j], float("-inf"))
+                else:
+                    self.assertEqual(mask[i, j], 0.0)
+
+    def test_mask_t1_has_no_future(self):
+        mask = self.attn._causal_mask(1)
+        _assert_shape(mask, (1, 1, 1, 1))
+        self.assertEqual(mask[0, 0, 0, 0], 0.0)
+
+    def test_mask_respects_dtype_and_device(self):
+        mask = self.attn._causal_mask(T, dtype=torch.float64)
+        self.assertEqual(mask.dtype, torch.float64)
+
+    def test_causal_invariance_with_future_token_changes(self):
+        q = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        k = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        v = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        mask = self.attn._causal_mask(T)
+        out_a = self.attn._scaled_dot_product_attention(q, k, v, mask)
+
+        q_future = q.clone()
+        k_future = k.clone()
+        v_future = v.clone()
+        q_future[:, :, T // 2 :, :] = torch.randn_like(q_future[:, :, T // 2 :, :])
+        k_future[:, :, T // 2 :, :] = torch.randn_like(k_future[:, :, T // 2 :, :])
+        v_future[:, :, T // 2 :, :] = torch.randn_like(v_future[:, :, T // 2 :, :])
+        out_b = self.attn._scaled_dot_product_attention(
+            q_future, k_future, v_future, mask
+        )
+
         torch.testing.assert_close(
-            out_a[:, : T // 2, :], out_b[:, : T // 2, :], atol=1e-6, rtol=1e-6
+            out_a[:, :, : T // 2, :], out_b[:, :, : T // 2, :], atol=1e-6, rtol=1e-6
+        )
+        self.assertFalse(
+            torch.allclose(out_a[:, :, T // 2 :, :], out_b[:, :, T // 2 :, :])
+        )
+
+    def test_invariance_fails_without_mask(self):
+        q = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        k = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        v = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        out_a = self.attn._scaled_dot_product_attention(q, k, v)
+
+        v_future = v.clone()
+        v_future[:, :, T // 2 :, :] = torch.randn_like(v_future[:, :, T // 2 :, :])
+        out_b = self.attn._scaled_dot_product_attention(q, k, v_future)
+
+        self.assertFalse(
+            torch.allclose(out_a[:, :, : T // 2, :], out_b[:, :, : T // 2, :])
         )
 
 
