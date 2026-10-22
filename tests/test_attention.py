@@ -55,6 +55,77 @@ class TestProjectionQKV(unittest.TestCase):
             CausalMultiHeadAttention(D_MODEL, n_heads=0)
 
 
+class TestScaledDotProductAttention(unittest.TestCase):
+    def setUp(self):
+        self.attn = CausalMultiHeadAttention(D_MODEL, N_HEADS, dropout=0.0)
+        self.attn.eval()
+        self.q = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        self.k = torch.randn(B, N_HEADS, T, HEAD_DIM)
+        self.v = torch.randn(B, N_HEADS, T, HEAD_DIM)
+
+    def test_output_shape(self):
+        out = self.attn._scaled_dot_product_attention(self.q, self.k, self.v)
+        _assert_shape(out, (B, N_HEADS, T, HEAD_DIM))
+
+    def test_matches_manual_scaled_attention(self):
+        scores = self.q @ self.k.transpose(-2, -1) * (HEAD_DIM ** -0.5)
+        probs = torch.softmax(scores, dim=-1)
+        expected = probs @ self.v
+        out = self.attn._scaled_dot_product_attention(self.q, self.k, self.v)
+        torch.testing.assert_close(out, expected, atol=1e-6, rtol=1e-6)
+
+    def test_scale_is_applied(self):
+        q = torch.cat([torch.randn(B, N_HEADS, 1, HEAD_DIM)] * 2, dim=2)
+        k = torch.cat(
+            [
+                torch.randn(B, N_HEADS, 1, HEAD_DIM) * 10.0,
+                torch.randn(B, N_HEADS, 1, HEAD_DIM),
+            ],
+            dim=2,
+        )
+        v = torch.randn(B, N_HEADS, 2, HEAD_DIM)
+        scaled = self.attn._scaled_dot_product_attention(q, k, v)
+        scores_scaled = q @ k.transpose(-2, -1) * (HEAD_DIM ** -0.5)
+        expected_scaled = torch.softmax(scores_scaled, dim=-1) @ v
+        scores_unscaled = q @ k.transpose(-2, -1)
+        expected_unscaled = torch.softmax(scores_unscaled, dim=-1) @ v
+        torch.testing.assert_close(scaled, expected_scaled, atol=1e-6, rtol=1e-6)
+        self.assertFalse(torch.allclose(scaled, expected_unscaled, atol=1e-4, rtol=1e-4))
+
+    def test_value_error_on_wrong_shape(self):
+        with self.assertRaises(ValueError):
+            self.attn._scaled_dot_product_attention(
+                torch.randn(B, T, HEAD_DIM), self.k, self.v
+            )
+        with self.assertRaises(ValueError):
+            self.attn._scaled_dot_product_attention(
+                torch.randn(B, N_HEADS, T, HEAD_DIM + 1), self.k, self.v
+            )
+
+    def test_gradient_flows(self):
+        q = self.q.clone().requires_grad_(True)
+        k = self.k.clone().requires_grad_(True)
+        v = self.v.clone().requires_grad_(True)
+        out = self.attn._scaled_dot_product_attention(q, k, v)
+        out.sum().backward()
+        for tensor in (q, k, v):
+            grad = tensor.grad
+            self.assertIsNotNone(grad)
+            self.assertFalse(torch.allclose(grad, torch.zeros_like(grad)))
+
+    def test_dropout_train_differs_from_eval(self):
+        attn = CausalMultiHeadAttention(D_MODEL, N_HEADS, dropout=DROPOUT)
+        q, k, v = self.q, self.k, self.v
+        attn.train()
+        out_train_a = attn._scaled_dot_product_attention(q, k, v)
+        out_train_b = attn._scaled_dot_product_attention(q, k, v)
+        attn.eval()
+        out_eval_a = attn._scaled_dot_product_attention(q, k, v)
+        out_eval_b = attn._scaled_dot_product_attention(q, k, v)
+        self.assertFalse(torch.allclose(out_train_a, out_train_b))
+        torch.testing.assert_close(out_eval_a, out_eval_b, atol=1e-6, rtol=1e-6)
+
+
 @unittest.skip("skeleton B2; prediction dijalankan di B9")
 class TestAttentionShape(unittest.TestCase):
     def test_output_shape(self):
