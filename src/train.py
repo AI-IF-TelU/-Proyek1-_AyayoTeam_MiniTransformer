@@ -48,10 +48,17 @@ def make_optimizer(model, lr: float = 3e-4, weight_decay: float = 0.01):
     return torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
 
+def _model_device(model) -> torch.device:
+    if hasattr(model, 'parameters'):
+        param = next(model.parameters(), None)
+        if param is not None:
+            return param.device
+    return torch.device("cpu")
+
+
 def training_step(model, x, y, optimizer, criterion) -> float:
     model.train()
-    param = next(model.parameters(), None)
-    device = param.device if param is not None else x.device
+    device = _model_device(model)
     x, y = x.to(device), y.to(device)
     optimizer.zero_grad()
     logits = model(x)
@@ -69,7 +76,7 @@ def evaluate(model, data_loader, criterion) -> float:
     n = 0
     with torch.no_grad():
         for x, y in data_loader:
-            device = param.device if param is not None else x.device
+            device = _model_device(model)
             x, y = x.to(device), y.to(device)
             logits = model(x)
             b, t, v = logits.shape
