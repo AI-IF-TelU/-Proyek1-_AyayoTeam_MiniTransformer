@@ -5,10 +5,14 @@ Prerequisites:
   - Modal token configured:  modal token new   (or env MODAL_TOKEN_ID / MODAL_TOKEN_SECRET)
 
 Run:
-    modal deploy modal_app.py          # pushes image, starts run, streams logs
-    modal volume ls ayayo-c14-vol      # list persisted outputs after run
-    modal volume get ayayo-c14-vol /outputs/metrics/c14_metrics.jsonl ./outputs/metrics/
-    modal volume get ayayo-c14-vol /outputs/metrics/minigpt_c14.pt ./outputs/metrics/
+    python -m modal run modal_app.py          # build image, run 10 epochs, stream logs
+    python -m modal volume ls ayayo-c14-vol    # list persisted outputs after run
+    python -m modal volume get ayayo-c14-vol c14_metrics.jsonl ./outputs/metrics/full/
+    python -m modal volume get ayayo-c14-vol minigpt_c14.pt ./outputs/metrics/full/
+
+Note: the volume is mounted at /vol (its own root), so files land at the
+volume root, not under /outputs/metrics. vol.commit() is called after writing
+so results persist after the container exits.
 """
 
 import modal
@@ -38,7 +42,7 @@ app = modal.App(name=APP_NAME, image=image, secrets=[])
 @app.function(
     gpu="T4",
     timeout=7200,      # 2 h — comfortably covers 10 epochs on T4
-    volumes={"/repo/outputs/metrics": vol},
+    volumes={"/vol": vol},  # volume root mounted at /vol
 )
 def run_c14_training():
     """Full 10-epoch training on T4, write metrics + checkpoint to volume."""
@@ -134,10 +138,9 @@ def run_c14_training():
     print(f"[C14] Params: {n_params:,}", flush=True)
 
     # --- Training ---
-    metrics_dir = "/repo/outputs/metrics"
-    metrics_path = os.path.join(metrics_dir, "c14_metrics.jsonl")
-    checkpoint_path = os.path.join(metrics_dir, "minigpt_c14.pt")
-    os.makedirs(metrics_dir, exist_ok=True)
+    # Write into the mounted volume (volume root = /vol)
+    metrics_path = "/vol/c14_metrics.jsonl"
+    checkpoint_path = "/vol/minigpt_c14.pt"
 
     history = []
     t0 = time.time()
@@ -178,6 +181,7 @@ def run_c14_training():
     write_metrics_jsonl(history, metrics_path)
     save_checkpoint(checkpoint_path, model,
                     vocab=tok.token_to_id, config=cfg.to_dict())
+    vol.commit()  # persist writes to the volume
     print(f"[C14] Metrics  -> {metrics_path}", flush=True)
     print(f"[C14] Checkpoint -> {checkpoint_path}", flush=True)
 
