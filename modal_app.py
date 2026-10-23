@@ -5,10 +5,10 @@ Prerequisites:
   - Modal token configured:  modal token new   (or env MODAL_TOKEN_ID / MODAL_TOKEN_SECRET)
 
 Run:
-    python -m modal run modal_app.py          # build image, run 10 epochs, stream logs
+    python -m modal run modal_app.py          # build image (first time ~3-5 min), then run 10 epochs
     python -m modal volume ls ayayo-c14-vol    # list persisted outputs after run
-    python -m modal volume get ayayo-c14-vol c14_metrics.jsonl ./outputs/metrics/full/
-    python -m modal volume get ayayo-c14-vol minigpt_c14.pt ./outputs/metrics/full/
+    python -m modal volume get ayayo-c14-vol c14_metrics.jsonl outputs/metrics/full/
+    python -m modal volume get ayayo-c14-vol minigpt_c14.pt outputs/metrics/full/
 
 Note: the volume is mounted at /vol (its own root), so files land at the
 volume root, not under /outputs/metrics. vol.commit() is called after writing
@@ -23,13 +23,10 @@ APP_NAME = "ayayo-c14"
 # ── image (torch CUDA wheel directly from PyTorch) ──────────────────────────
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .pip_install(
-        "torch",
-        "--index-url", "https://download.pytorch.org/whl/cu121",
-    )
+    .pip_install("torch", index_url="https://download.pytorch.org/whl/cu121")
     .pip_install("numpy", "datasets", "huggingface-hub")
     # Copy project source (src/*) into the container at /repo/src
-    .add_local_dir(".", "/repo", exclude=["node_modules", "__pycache__", ".git"])
+    .add_local_dir(".", "/repo", ignore=["node_modules", "__pycache__", ".git", "outputs"])
 )
 
 # ── persistent volume (outputs survive between runs) ────────────────────────
@@ -40,8 +37,9 @@ app = modal.App(name=APP_NAME, image=image, secrets=[])
 
 
 @app.function(
-    gpu="T4",
-    timeout=7200,      # 2 h — comfortably covers 10 epochs on T4
+    cpu=8,
+    memory=16384,
+    timeout=14400,     # 4 h — 10 epochs on Modal CPU (no payment method needed)
     volumes={"/vol": vol},  # volume root mounted at /vol
 )
 def run_c14_training():
