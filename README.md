@@ -244,3 +244,18 @@ Jika tes gagal, perbaiki terlebih dahulu. Jangan menandai task selesai atau meng
 | [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md) | Keputusan arsitektur dan trade-off |
 
 **Prinsip utama:** satu spesifikasi, satu standar pengujian, logging yang dapat diverifikasi, dan satu subtask aktif pada satu waktu. Tujuan proyek bukan hanya menghasilkan kode yang berjalan, tetapi juga memahami bagaimana Mini-Transformer dibangun.
+
+
+## 11. Testing (pytest)
+
+Runner resmi: `pytest` (terdaftar di `requirements.txt`). Konfigurasi di `pytest.ini`.
+
+Perintah menjalankan seluruh suite:
+```
+python -m pytest -q
+```
+Subset per modul:
+```
+python -m pytest tests/test_tokenizer.py -q
+```
+Catatan: memerlukan PyTorch terpasang (lihat requirements.txt). Jika modul A/B/C belum tersedia, collection akan gagal dengan ImportError - bukan kegagalan tes.
