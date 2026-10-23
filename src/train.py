@@ -1,6 +1,26 @@
 """Training utilities for MiniGPT (contract: TECH_SPEC 6, ADR-011)."""
 
-import random
+import json
+import os
+
+
+def write_metrics_jsonl(history, path: str) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        for rec in history:
+            f.write(json.dumps(rec) + "\n")
+
+
+def save_checkpoint(path: str, model, vocab=None, config=None) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    torch.save(
+        {"state_dict": model.state_dict(), "vocab": vocab, "config": config},
+        path,
+    )
+
+
+def load_checkpoint(path: str):
+    return torch.load(path, map_location="cpu")
 
 import numpy as np
 import torch
@@ -57,6 +77,10 @@ def train(
     weight_decay: float = 0.01,
     pad_id: int = 0,
     seed: int = 42,
+    metrics_path: str = None,
+    checkpoint_path: str = None,
+    vocab=None,
+    config=None,
 ):
     set_seed(seed)
     optimizer = make_optimizer(model, lr=lr, weight_decay=weight_decay)
@@ -75,4 +99,8 @@ def train(
         history.append(
             {"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss}
         )
+    if metrics_path is not None:
+        write_metrics_jsonl(history, metrics_path)
+    if checkpoint_path is not None:
+        save_checkpoint(checkpoint_path, model, vocab=vocab, config=config)
     return history
