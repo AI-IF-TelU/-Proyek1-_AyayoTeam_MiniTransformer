@@ -27,6 +27,11 @@ def load_checkpoint(path: str):
     return torch.load(path, map_location="cpu")
 
 
+def get_device() -> torch.device:
+    """Pick CUDA when available, otherwise CPU (ADR-014 device policy)."""
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 def set_seed(seed: int = 42) -> None:
     random.seed(seed)
     np.random.seed(seed)
@@ -45,6 +50,9 @@ def make_optimizer(model, lr: float = 3e-4, weight_decay: float = 0.01):
 
 def training_step(model, x, y, optimizer, criterion) -> float:
     model.train()
+    param = next(model.parameters(), None)
+    device = param.device if param is not None else x.device
+    x, y = x.to(device), y.to(device)
     optimizer.zero_grad()
     logits = model(x)
     b, t, v = logits.shape
@@ -56,10 +64,13 @@ def training_step(model, x, y, optimizer, criterion) -> float:
 
 def evaluate(model, data_loader, criterion) -> float:
     model.eval()
+    param = next(model.parameters(), None)
     total = 0.0
     n = 0
     with torch.no_grad():
         for x, y in data_loader:
+            device = param.device if param is not None else x.device
+            x, y = x.to(device), y.to(device)
             logits = model(x)
             b, t, v = logits.shape
             loss = criterion(logits.reshape(b * t, v), y.reshape(b * t))
@@ -81,6 +92,7 @@ def train(
     checkpoint_path: str = None,
     vocab=None,
     config=None,
+    on_epoch=None,
 ):
     set_seed(seed)
     optimizer = make_optimizer(model, lr=lr, weight_decay=weight_decay)
@@ -96,9 +108,10 @@ def train(
             n += x.size(0)
         train_loss = total / max(n, 1)
         val_loss = evaluate(model, val_loader, criterion)
-        history.append(
-            {"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss}
-        )
+        rec = {"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss}
+        history.append(rec)
+        if on_epoch is not None:
+            on_epoch(rec)
     if metrics_path is not None:
         write_metrics_jsonl(history, metrics_path)
     if checkpoint_path is not None:
