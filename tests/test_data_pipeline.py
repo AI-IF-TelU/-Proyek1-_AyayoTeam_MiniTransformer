@@ -52,19 +52,55 @@ def test_decode_skips_specials():
 
 def test_dataset_xy_relation_and_padding():
     tok = Tokenizer()
+    # Gunakan dokumen panjang (>=8 token real) agar setelah bos+eos >=9 token,
+    # maka window_size=9 menghasilkan sampel dengan len==context_length==8.
+    long_text = "satu dua tiga empat lima enam tujuh delapan sembilan sepuluh"
+    tok.fit([long_text])
+    ds = TextDataset([long_text], tok, context_length=8)
+    assert len(ds) >= 1
+    x, y = ds[0]
+    assert x.dtype == torch.long and y.dtype == torch.long
+    assert x.shape == y.shape == (8,)
+    # relasi x[t+1] == y[t] pada semua posisi non-pad
+    mask = (y != 0)
+    assert torch.all(x[1:][mask[1:]] == y[:-1][mask[1:]])
+    # dokumen panjang -> sliding window; tidak ada pad di tengah-tengah real token
+    assert not torch.any(x == 0) and not torch.any(y == 0)
+    # x dimulai dengan bos untuk window pertama
+    assert x[0].item() == tok.special_tokens["<bos>"]
+    # window terakhir di dataset berakhir dengan eos
+    last_x, last_y = ds[len(ds) - 1]
+    assert last_y[-1].item() == tok.special_tokens["<eos>"]
+
+
+def test_short_doc_no_pad_in_dataset():
+    """Dokumen pendek (<65 token) -> __getitem__ kembalikan tensor pendek tanpa pad."""
+    tok = Tokenizer()
     tok.fit(["halo dunia"])
     ds = TextDataset(["halo dunia"], tok, context_length=8)
     assert len(ds) == 1
     x, y = ds[0]
-    assert x.dtype == torch.long and y.dtype == torch.long
-    assert x.shape == y.shape == (8,)
-    # non-pad positions: x[t+1] == y[t]
-    mask = (y != 0)
-    # check for first len-1 positions
-    assert torch.all(x[1:3] == y[0:2])
-    # padding zeros at tail
-    assert torch.all(x[3:] == 0)
-    assert torch.all(y[3:] == 0)
+    # "halo dunia" -> encode 2 token + bos+eos = 4 token -> full_ids[:-1]/[1:] = 3 token
+    assert x.shape == y.shape == (3,)
+    assert torch.all(x[1:] == y[:-1])
+    # tidak ada padding di dataset level
+    assert not torch.any(x == 0) and not torch.any(y == 0)
+
+
+def test_padding_happens_in_dataloader():
+    """Padding baru terjadi saat collate di DataLoader, bukan di Dataset."""
+    tok = Tokenizer()
+    tok.fit(["halo dunia", "hai dunia juga"])
+    ds = TextDataset(["halo dunia", "hai dunia juga"], tok, context_length=8)
+    dl = create_dataloader(ds, batch_size=2, shuffle=False, pad_id=0, context_length=8)
+    x, y = next(iter(dl))
+    # batch di-pad ke context_length
+    assert x.shape == (2, 8)
+    assert y.shape == (2, 8)
+    assert x.dtype == torch.long
+    # baris pertama (short doc) harus di-pad sampai len==8
+    assert x[0].shape == (8,)
+    assert y[0].shape == (8,)
 
 
 def test_no_cross_document_windows():
