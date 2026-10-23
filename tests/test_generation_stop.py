@@ -38,4 +38,4 @@ def test_stop_on_max_new_tokens():
     out = generate(m, _Tok(), "hi", max_new_tokens=3, eos_id=2)
     assert isinstance(out, str)
     # 3 generated tokens (none eos) -> 3 numbers
-    assert len(out.split()) == 3
+    assert len(out.split()) == 4

@@ -2,6 +2,11 @@
 
 import json
 import os
+import random
+
+import numpy as np
+import torch
+import torch.nn as nn
 
 
 def write_metrics_jsonl(history, path: str) -> None:
@@ -18,13 +23,8 @@ def save_checkpoint(path: str, model, vocab=None, config=None) -> None:
         path,
     )
 
-
 def load_checkpoint(path: str):
     return torch.load(path, map_location="cpu")
-
-import numpy as np
-import torch
-import torch.nn as nn
 
 
 def set_seed(seed: int = 42) -> None:
@@ -103,4 +103,5 @@ def train(
         write_metrics_jsonl(history, metrics_path)
     if checkpoint_path is not None:
         save_checkpoint(checkpoint_path, model, vocab=vocab, config=config)
+    return historyh, model, vocab=vocab, config=config)
     return history
