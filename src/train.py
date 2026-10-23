@@ -103,5 +103,4 @@ def train(
         write_metrics_jsonl(history, metrics_path)
     if checkpoint_path is not None:
         save_checkpoint(checkpoint_path, model, vocab=vocab, config=config)
-    return historyh, model, vocab=vocab, config=config)
     return history
