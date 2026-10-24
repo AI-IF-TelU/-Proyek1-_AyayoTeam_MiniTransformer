@@ -246,7 +246,62 @@ Jika tes gagal, perbaiki terlebih dahulu. Jangan menandai task selesai atau meng
 **Prinsip utama:** satu spesifikasi, satu standar pengujian, logging yang dapat diverifikasi, dan satu subtask aktif pada satu waktu. Tujuan proyek bukan hanya menghasilkan kode yang berjalan, tetapi juga memahami bagaimana Mini-Transformer dibangun.
 
 
-## 11. Testing (pytest)
+## 11. Training dan Text Generation
+
+### Menjalankan training eksperimen (Modal CPU)
+
+Training penuh dijalankan di Modal (CPU 8 core, tidak memerlukan metode pembayaran) melalui `modal_app.py`:
+
+```powershell
+python -m modal run modal_app.py
+```
+
+Langkah ini meng-upload source proyek, melatih 4 epoch pada `data/processed/train.jsonl` dengan validasi `data/processed/val.jsonl`, lalu menyimpan hasil ke volume `ayayo-c14-vol`. Ambil artefak ke repo lokal:
+
+```powershell
+python -m modal volume get ayayo-c14-vol c14_metrics.jsonl outputs/metrics/full/
+python -m modal volume get ayayo-c14-vol minigpt_c14.pt outputs/metrics/full/
+```
+
+Metrics ditulis dalam format JSONL (ADR-011): satu baris per epoch (`train_loss`, `val_loss`, `epoch_sec`) dan satu baris event `generation` berisi contoh keluaran beserta total durasi. Checkpoint berisi `state_dict` + `vocab` + `config` dan dapat dimuat ulang.
+
+### Memuat checkpoint dan melakukan generate
+
+```python
+from src.train import load_checkpoint
+from src.model.minigpt import MiniGPT
+from src.data.tokenizer import Tokenizer
+from src.generate import generate
+
+ck = load_checkpoint("outputs/metrics/full/minigpt_c14.pt")
+
+# d_ff tersimpan di config tetapi diturunkan otomatis oleh MiniGPT (4 * d_model)
+model_cfg = {k: v for k, v in ck["config"]["model"].items() if k != "d_ff"}
+model = MiniGPT(**model_cfg)
+model.load_state_dict(ck["state_dict"])
+
+tok = Tokenizer()
+tok.token_to_id = ck["vocab"]
+
+print(generate(model, tok, "presiden indonesia", max_new_tokens=40))
+```
+
+Generation menggunakan **greedy decoding**: berhenti saat `<eos>` dihasilkan atau saat `max_new_tokens` tercapai, dengan konteks dibatasi `context_length` terakhir (window geser).
+
+### Hasil eksperimen 4 epoch (Modal CPU)
+
+Detail lengkap (metadata, tabel loss, contoh generate, dan analisis overfitting) ada di [`docs/ai-logs/reports/AI-LOG-C14-experiment.md`](docs/ai-logs/reports/AI-LOG-C14-experiment.md).
+
+| Epoch | Train loss | Val loss |
+|---:|---:|---:|
+| 1 | 5.568583 | 7.135150 |
+| 2 | 4.152143 | 7.856671 |
+| 3 | 3.640476 | 8.304918 |
+| 4 | 3.335589 | 8.649888 |
+
+Train loss turun sementara val loss naik konsisten — **indikasi overfitting**, bukan bukti model berkualitas baik.
+
+## 12. Testing (pytest)
 
 Runner resmi: `pytest` (terdaftar di `requirements.txt`). Konfigurasi di `pytest.ini`.
 

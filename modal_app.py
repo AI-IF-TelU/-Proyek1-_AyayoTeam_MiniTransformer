@@ -5,7 +5,7 @@ Prerequisites:
   - Modal token configured:  modal token new   (or env MODAL_TOKEN_ID / MODAL_TOKEN_SECRET)
 
 Run:
-    python -m modal run modal_app.py          # build image (first time ~3-5 min), then run 10 epochs
+    python -m modal run modal_app.py          # build image (first time ~3-5 min), then run 4 epochs
     python -m modal volume ls ayayo-c14-vol    # list persisted outputs after run
     python -m modal volume get ayayo-c14-vol c14_metrics.jsonl outputs/metrics/full/
     python -m modal volume get ayayo-c14-vol minigpt_c14.pt outputs/metrics/full/
@@ -39,11 +39,11 @@ app = modal.App(name=APP_NAME, image=image, secrets=[])
 @app.function(
     cpu=8,
     memory=16384,
-    timeout=14400,     # 4 h — 10 epochs on Modal CPU (no payment method needed)
+    timeout=14400,     # 4 h — 4 epochs on Modal CPU (no payment method needed)
     volumes={"/vol": vol},  # volume root mounted at /vol
 )
 def run_c14_training():
-    """Full 10-epoch training on T4, write metrics + checkpoint to volume."""
+    """Full 4-epoch training on T4, write metrics + checkpoint to volume."""
     import os
     import sys
     import time
@@ -112,7 +112,7 @@ def run_c14_training():
         train=TrainConfig(
             seed=42,
             batch_size=32,
-            epochs=10,
+            epochs=4,
             lr=3e-4,
             weight_decay=0.01,
             pad_id=0,
@@ -166,22 +166,19 @@ def run_c14_training():
             "epoch_sec": round(elapsed, 2),
         }
         history.append(rec)
+        # commit tiap epoch agar tidak hilang jika container putus
+        write_metrics_jsonl(history, metrics_path)
+        save_checkpoint(checkpoint_path, model,
+                        vocab=tok.token_to_id, config=cfg.to_dict())
+        vol.commit()
         print(
-            f"[C14] Epoch {epoch:02d}/10 | train={train_loss:.4f} "
+            f"[C14] Epoch {epoch:02d}/4 | train={train_loss:.4f} "
             f"val={val_loss:.4f} ({elapsed:.1f}s)",
             flush=True,
         )
 
     total_time = time.time() - t0
     print(f"[C14] Total training time: {total_time:.1f}s", flush=True)
-
-    # --- Persist metrics & checkpoint ---
-    write_metrics_jsonl(history, metrics_path)
-    save_checkpoint(checkpoint_path, model,
-                    vocab=tok.token_to_id, config=cfg.to_dict())
-    vol.commit()  # persist writes to the volume
-    print(f"[C14] Metrics  -> {metrics_path}", flush=True)
-    print(f"[C14] Checkpoint -> {checkpoint_path}", flush=True)
 
     # --- Generation example ---
     model.eval()
