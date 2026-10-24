@@ -204,12 +204,13 @@ def make_model(kind: str, cfg: Dict[str, Any] = None):
     if kind == "minigpt":
         from src.model.minigpt import MiniGPT
 
+        # MiniGPT tidak menerima d_ff: nilainya ditetapkan internal 4 * d_model
+        # (TECH_SPEC §6), sehingga cfg["d_ff"] tidak diteruskan.
         return MiniGPT(
             vocab_size=100,
             d_model=cfg["d_model"],
             n_heads=cfg["n_heads"],
             n_layers=cfg["n_layers"],
-            d_ff=cfg["d_ff"],
             context_length=cfg["context_length"],
             dropout=cfg["dropout"],
         )

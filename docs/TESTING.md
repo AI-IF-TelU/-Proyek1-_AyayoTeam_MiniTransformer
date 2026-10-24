@@ -117,6 +117,81 @@ python -m pytest -q
 
 Output aktual: `117 passed in 18.06s` (103 tes sebelum D5 + 14 tes baru).
 
+### Subtask D6 — Tes Decoder Block dan MiniGPT
+
+Perintah:
+
+```powershell
+python -m pytest tests/test_decoder_block_contract.py tests/test_minigpt_contract.py -v
+```
+
+Output aktual: `27 passed in 11.02s` (Python 3.10.6, pytest 9.1.1, torch 2.14.1+cpu).
+
+Tes baru (13 tes Decoder Block + 14 tes MiniGPT), semuanya di level `forward` publik:
+
+`tests/test_decoder_block_contract.py`:
+
+- `TestDecoderBlockStructure::test_baseline_hyperparameters` — `pre_norm=True`, `d_ff=256`, `head_dim=16`, LayerNorm epsilon `1e-5`.
+- `TestDecoderBlockStructure::test_ffn_projection_sizes_follow_d_ff` — `fc1` `[d_ff, d_model]`, `fc2` `[d_model, d_ff]`.
+- `TestDecoderBlockStructure::test_block_registers_no_positional_buffers` — tidak ada buffer; PE bukan bagian block.
+- `TestDecoderBlockForwardShape::test_baseline_shape_and_finite` / `test_single_position` — `[2,64,64] -> [2,64,64]` dan `T=1` finite.
+- `TestResidualConnectionContract::test_zeroed_parameters_make_block_identity` — seluruh parameter dinolkan → `out == x` eksak (residual aditif, bukan penggantian).
+- `TestResidualConnectionContract::test_identity_path_keeps_gradient_one` — `d out / d x == 1` eksak; jalur identitas tidak memblokir gradien.
+- `TestCausalMaskingThroughBlock::test_every_cut_leaves_past_unchanged` — untuk `k ∈ {1, 8, 32, 63}`, mengubah `x[:, k:]` tidak mengubah `out[:, :k]` (`atol=0`).
+- `TestCausalMaskingThroughBlock::test_past_perturbation_changes_its_own_output` / `test_future_perturbation_changes_future_output` — kontrol sensitivitas agar invariance bukan hasil jaringan "mati".
+- `TestPositionIndependence::test_identical_positions_produce_identical_outputs` — input identik di semua posisi → output identik; block tidak menambahkan posisi (PE ada di MiniGPT).
+- `TestBatchIndependence::test_perturbing_one_item_does_not_change_other_items` — item batch lain tidak berubah eksak; item yang diubah berubah.
+- `TestNoContextLengthGuard::test_longer_sequences_still_forward` — `T=65` dan `T=128` valid; guard `context_length` hanya milik MiniGPT.
+
+`tests/test_minigpt_contract.py`:
+
+- `TestMiniGPTStructure::test_component_types_and_baseline_hyperparameters` — 2 `DecoderBlock` dengan `d_ff=256`, `SinCosPositionalEncoding`, `ln_f` epsilon `1e-5`.
+- `TestMiniGPTStructure::test_lm_head_is_not_tied_to_embedding` — bobot LM head `[V, d]` terpisah (`data_ptr` berbeda), tanpa bias.
+- `TestMiniGPTStructure::test_positional_encoding_buffer_shape` — buffer `pos_enc.pe` `[64, 64]`, non-trainable.
+- `TestMiniGPTForwardShape::test_baseline_shape_dtype_finite` / `test_single_token_sequence` — `[2,64] int64 -> [2,64,100] float32` finite, termasuk `T=1`.
+- `TestMiniGPTContextGuard::test_boundary_at_baseline_context_length` — `T=64` lolos, `T=65` `ValueError`.
+- `TestMiniGPTContextGuard::test_guard_uses_configured_context_length` — `context_length=8`: `T=8` lolos, `T=9` `ValueError`; `context_length=128` menerima `T=128` (bukan hardcode 64).
+- `TestMiniGPTCausality::test_every_cut_leaves_past_unchanged` — invariance causal menembus Embedding + PE + 2 block + LN akhir + head (`atol=0`).
+- `TestMiniGPTCausality::test_last_position_reacts_to_last_token` — kontrol sensitivitas.
+- `TestPositionalEncodingIsApplied::test_identical_tokens_at_different_positions_give_different_logits` — token sama di posisi 0/1/2 menghasilkan logits berbeda; membuktikan PE benar-benar ditambahkan.
+- `TestMiniGPTGradients::test_all_parameters_receive_finite_nonzero_gradient` — seluruh parameter (embedding, semua block, `ln_f`, `lm_head`) punya gradien finite dan nonzero.
+- `TestMiniGPTGradients::test_embedding_gradient_reaches_used_token_ids_only` — gradien embedding hanya pada id yang dipakai.
+- `TestDropoutBehavior::test_eval_is_deterministic_and_train_differs` — `eval()` dua forward identik eksak; `train()` (dropout 0.1) berbeda.
+- `TestMiniGPTInitValidation::test_value_error_when_d_model_not_divisible_by_n_heads` — `ValueError` saat `d_model=64, n_heads=3`.
+
+Nilai tambah dibanding tes pemilik modul: tes Issue B/C memeriksa shape, dtype, guard, dropout, dan kesetaraan pre/post-norm; D6 membuktikan sifat kontraktual (residual aditif, gradien identitas, causality lintas block/model, PE benar-benar dipakai, LM head tidak di-tie) dan guard `context_length` yang terkonfigurasi.
+
+#### Debugging aktual D6
+
+Run pertama (`python -m pytest tests/test_decoder_block_contract.py tests/test_minigpt_contract.py -v`): `3 failed, 24 passed in 10.34s`.
+
+1. `TestPositionIndependence::test_identical_positions_produce_identical_outputs` gagal dengan `Greatest absolute difference: 2.384185791015625e-07` (28/64 elemen) saat memakai `atol=0`. Penyebab: jumlah suku softmax bertambah dengan posisi sehingga penjumlahan `float32` berbeda urutan/panjang, bukan pelanggaran kontrak. Perbaikan: toleransi `atol=1e-6, rtol=1e-5` (setara preseden pembulatan `float32` pada D5).
+2. `TestBatchIndependence::test_perturbing_one_item_does_not_change_other_items` gagal karena asersi uji salah: item batch 0 (yang sengaja diubah) diperiksa "tidak berubah". Perbaikan: item 0 harus berubah (`assertFalse(allclose)`), item 1 harus identik eksak.
+3. `TestMiniGPTStructure::test_positional_encoding_buffer_shape` gagal `KeyError: 'pe'` karena buffer milik submodul sehingga nama terdaftarnya `pos_enc.pe`. Perbaikan: kunci `pos_enc.pe`.
+
+#### Kontrol negatif (verifikasi tes tidak lolos palsu)
+
+Skrip sementara di luar repo (`%TEMP%\kilo\mutation_check.py`) menjalankan ulang invariansi causal block/model, lalu mengganti `_causal_mask` menjadi nol pada proses yang sama. Output aktual:
+
+```text
+causal intact   -> block fails: False model fails: False
+mask removed    -> block fails: True model fails: True
+```
+
+Artinya tes causality D6 benar-benar gagal bila causal mask dihilangkan. `src/` tidak diubah permanen.
+
+Seluruh suite setelah D6:
+
+```powershell
+python -m pytest -q
+```
+
+Output aktual: `144 passed in 16.26s` (117 tes sebelum D6 + 27 tes baru). Subset regresi model: `python -m pytest tests/test_decoder_block.py tests/test_decoder_block_contract.py tests/test_causal_masking.py tests/test_minigpt_logits.py tests/test_minigpt_contract.py tests/test_minigpt_mock.py -q` → `57 passed in 10.66s`.
+
+#### Perbaikan helper (di luar `src/`)
+
+`tests/helpers.py::make_model("minigpt")` sebelumnya meneruskan `d_ff` ke `MiniGPT`, yang tidak memiliki parameter tersebut (`TypeError: MiniGPT.__init__() got an unexpected keyword argument 'd_ff'`), sehingga helper tidak pernah bisa membuat MiniGPT. Perbaikan: argumen `d_ff` tidak diteruskan; nilai `d_ff` memang ditetapkan internal `4 * d_model` (TECH_SPEC §6). Verifikasi: `make_model('minigpt')` → `MiniGPT 2 256 torch.Size([100, 64])`. Tidak ada perubahan kontrak `src/`.
+
 
 ## Catatan Teknis
 
