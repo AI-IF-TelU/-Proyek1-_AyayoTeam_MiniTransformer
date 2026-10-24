@@ -28,7 +28,7 @@ def load_checkpoint(path: str):
 
 
 def get_device() -> torch.device:
-    """Pick CUDA when available, otherwise CPU (ADR-014 device policy)."""
+    """Pick CUDA when available, otherwise CPU."""
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 

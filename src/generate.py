@@ -5,8 +5,12 @@ import torch
 
 @torch.no_grad()
 def generate(model, tokenizer, prompt: str, max_new_tokens: int = 64,
-            context_length: int = 64, bos_id: int = 1, eos_id: int = 2) -> str:
+            context_length: int = None, bos_id: int = 1, eos_id: int = 2) -> str:
     model.eval()
+    # Default mengikuti model agar model non-baseline tidak melempar ValueError
+    # di tengah generasi (F-D9-02).
+    if context_length is None:
+        context_length = getattr(model, "context_length", 64)
     param = next(model.parameters(), None)
     device = param.device if param is not None else torch.device("cpu")
     ids = [bos_id] + tokenizer.encode(prompt.lower())

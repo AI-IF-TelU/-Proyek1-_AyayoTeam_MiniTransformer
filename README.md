@@ -265,6 +265,14 @@ python -m modal volume get ayayo-c14-vol minigpt_c14.pt outputs/metrics/full/
 
 Metrics ditulis dalam format JSONL (ADR-011): satu baris per epoch (`train_loss`, `val_loss`, `epoch_sec`) dan satu baris event `generation` berisi contoh keluaran beserta total durasi. Checkpoint berisi `state_dict` + `vocab` + `config` dan dapat dimuat ulang.
 
+Checkpoint dan metrics juga dapat dihasilkan langsung dari clone tanpa Modal (data
+`data/processed/*.jsonl` sudah ada di repo):
+
+```powershell
+python run_training.py --max-epochs 1 --metrics-dir outputs/metrics
+# menghasilkan outputs/metrics/minigpt_c14.pt dan outputs/metrics/c14_metrics.jsonl
+```
+
 ### Memuat checkpoint dan melakukan generate
 
 ```python
@@ -273,18 +281,24 @@ from src.model.minigpt import MiniGPT
 from src.data.tokenizer import Tokenizer
 from src.generate import generate
 
-ck = load_checkpoint("outputs/metrics/full/minigpt_c14.pt")
+# Hasil `modal volume get` ada di outputs/metrics/full/;
+# `python run_training.py --metrics-dir outputs/metrics` menulis ke outputs/metrics/.
+ck = load_checkpoint("outputs/metrics/minigpt_c14.pt")
 
 # d_ff tersimpan di config tetapi diturunkan otomatis oleh MiniGPT (4 * d_model)
 model_cfg = {k: v for k, v in ck["config"]["model"].items() if k != "d_ff"}
 model = MiniGPT(**model_cfg)
 model.load_state_dict(ck["state_dict"])
 
-tok = Tokenizer()
-tok.token_to_id = ck["vocab"]
+# Restore resmi: mengisi token_to_id, id_to_token, dan vocab_size sekaligus.
+tok = Tokenizer.from_vocab(ck["vocab"])
 
 print(generate(model, tok, "presiden indonesia", max_new_tokens=40))
 ```
+
+Tanpa `Tokenizer.from_vocab`, `id_to_token` dan `vocab_size` tetap kosong sehingga
+`decode`/`generate` menghasilkan string kosong tanpa error (lihat
+[`docs/D9_FAILURE_LOG.md`](docs/D9_FAILURE_LOG.md) F-D9-01).
 
 Generation menggunakan **greedy decoding**: berhenti saat `<eos>` dihasilkan atau saat `max_new_tokens` tercapai, dengan konteks dibatasi `context_length` terakhir (window geser).
 

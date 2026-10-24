@@ -265,6 +265,11 @@ JSONL lines parsed: 234611, unparseable: none
 
 ## 4. Status temuan terbuka di `edbf5cc` (probe aktual)
 
+> **Status per D14 (2026-10-24):** F-D9-01, F-D9-02, F-D9-04, F-D9-05, F-D9-06, dan F-D11-01
+> sudah **CLOSED** dengan perbaikan + tes; F-D9-03 tetap **OPEN** menunggu keputusan koordinator.
+> Bukti penutupan ada di §4.7 dan `docs/D14_FIX_REPORT.md`. Isi §4.1–§4.6 dipertahankan sebagai
+> rekaman historis probe pada `edbf5cc` dan tidak diubah.
+
 Probe dijalankan dari luar repo (`%TEMP%\kilo\d13\probe_d13.py`) sehingga tidak ada berkas uji
 baru di repository.
 
@@ -361,6 +366,24 @@ pemeriksaan torch di dalam `try/except Exception: pass`, sehingga asersi pertama
 menjadi bukti untuk tensor (selalu jatuh ke fallback dengan arah yang sama). Dampak saat ini **nol**
 karena fixture `batch` tidak dikonsumsi tes mana pun; jika helper ini dipakai tes baru, ia harus
 diperbaiki lebih dulu (D14/keputusan pemilik Issue D).
+
+### 4.7 Status setelah D14 (OPEN → CLOSED)
+
+D14 memperbaiki temuan yang dapat ditutup tanpa keputusan pihak lain. Bukti lengkap ada di
+`docs/D14_FIX_REPORT.md`; ringkasannya:
+
+| ID | Status D14 | Perubahan | Bukti tes / probe |
+|---|---|---|---|
+| F-D9-01 | **CLOSED** | `Tokenizer.from_vocab(vocab)` mengisi `token_to_id`, `id_to_token`, `_vocab_size`; README §11 memakai jalur ini | `test_tokenizer.py::TestTokenizerFromVocab` (5), `test_checkpoint_restore_contract.py::test_restore_checkpoint_then_generate_is_not_empty`; probe checkpoint nyata: `id_to_token 2364/2364`, `vocab_size 2364`, `generate` non-kosong |
+| F-D9-02 | **CLOSED** | `generate(context_length=None)` → `getattr(model, "context_length", 64)` | `test_generate_context_contract.py` (4 tes); probe `context_length=8` + `eos_id=-1` tidak lagi `ValueError` |
+| F-D9-03 | **OPEN** (butuh keputusan) | tidak diubah — lihat §4.3 dan `docs/D14_FIX_REPORT.md` §6 | perbandingan statis `TECH_SPEC.md:105` vs signature aktual |
+| F-D9-04 | **CLOSED** | docstring `src/train.py:31` tidak lagi merujuk `ADR-014` | pemindaian `ADR-01[3-9]` di `src/` → kosong |
+| F-D9-05 | **CLOSED** | `docs/D1_Acceptance_Criteria_Matrix.md`, `docs/D2_Testing_Framework.md`, `docs/D3_Test_Structure.md` dibuat | ketiga berkas ada dan dirujuk `docs/TESTING.md` §D14 |
+| F-D9-06 | **CLOSED** | README §11 menyertakan perintah `run_training.py` yang menghasilkan artefak dari clone, dan contoh memakai path yang benar-benar dibuat perintah itu | jalur restore dijalankan pada checkpoint hasil `run_training.py` 1 epoch (subset 20/10 artikel): decode + generate non-kosong |
+| F-D11-01 | **CLOSED** | `make_batch` membangun `y[:, :-1] = x[:, 1:]`; `assert_x_y_shift` memeriksa arah kontrak tanpa `try/except` yang menelan `AssertionError` | `test_helpers_contract.py` (7 tes), termasuk penolakan arah terbalik dan perbandingan dengan `TextDataset` nyata |
+
+Catatan: F-D9-06 ditutup sebatas "contoh restore dapat dijalankan dari clone"; artefak C14 asli
+tetap tidak ada di repo (tidak dilacak Git) dan angka loss C14 tetap dikutip, bukan diukur ulang.
 
 ---
 

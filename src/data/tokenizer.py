@@ -36,6 +36,25 @@ class Tokenizer:
         
         self._vocab_size = len(self.token_to_id)
 
+    @classmethod
+    def from_vocab(cls, vocab: Dict[str, int]) -> "Tokenizer":
+        """Bangun tokenizer dari `vocab` checkpoint (jalur restore resmi, F-D9-01).
+
+        Mengisi `token_to_id`, `id_to_token`, dan `_vocab_size` sekaligus agar
+        `decode` dan `vocab_size` tetap benar setelah checkpoint dimuat ulang.
+        """
+        if not vocab:
+            raise ValueError("vocab must not be empty")
+        ids = list(vocab.values())
+        if len(set(ids)) != len(ids):
+            raise ValueError("vocab ids must be unique")
+
+        tokenizer = cls()
+        tokenizer.token_to_id = dict(vocab)
+        tokenizer.id_to_token = {token_id: token for token, token_id in vocab.items()}
+        tokenizer._vocab_size = len(tokenizer.token_to_id)
+        return tokenizer
+
     def encode(self, text: str) -> List[int]:
         """Lowercase -> tokenisasi -> to_id."""
         tokens = re.findall(r"\w+|[^\w\s]", text.lower())

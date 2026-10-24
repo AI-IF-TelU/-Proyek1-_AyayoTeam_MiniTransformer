@@ -45,15 +45,20 @@ def get_special_ids() -> Dict[str, int]:
 
 
 def make_batch(B: int, T: int = 64, V: int = 100, pad_id: int = PAD_ID) -> Tuple[Any, Any]:
+    """Batch kontrak §4: `x[i,t] == y[i,t-1]` untuk posisi non-pad.
+
+    Mengikuti `TextDataset`: `y` adalah `x` yang digeser satu posisi ke kiri
+    (`y[:, t] == x[:, t+1]`), sehingga target pada posisi `t` adalah token berikutnya.
+    """
     import torch
 
     torch.manual_seed(42)
     x = torch.randint(4, V, (B, T), dtype=torch.long)
     mask = torch.rand(B, T) < 0.1
     x = x.masked_fill(mask, pad_id)
-    y = torch.zeros_like(x)
-    y[:, 1:] = x[:, :-1]
-    y[:, 0] = pad_id
+    y = torch.full_like(x, pad_id)
+    if T >= 2:
+        y[:, :-1] = x[:, 1:]
     return x, y
 
 
@@ -81,35 +86,41 @@ def assert_shape(tensor: Any, expected: Sequence[int]) -> None:
 
 
 def assert_x_y_shift(x: Any, y: Any, pad_id: int = PAD_ID) -> None:
-    """Assert x[i,t] == y[i,t-1] for positions where target is not pad (TECH_SPEC §4)."""
-    try:
-        import torch  # type: ignore
+    """Assert kontrak §4: `x[i,t] == y[i,t-1]` untuk posisi target non-pad.
 
-        if isinstance(x, torch.Tensor) and isinstance(y, torch.Tensor):
-            if x.shape != y.shape:
-                raise AssertionError(f"x,y shape mismatch: {x.shape} vs {y.shape}")
-            # check shift where y != pad_id
-            if y.shape[1] >= 1:
-                # y[:,0] may be pad by construction
-                if y.shape[1] >= 2:
-                    nonpad = y[:, 1:] != pad_id
-                    if nonpad.any():
-                        assert torch.all(x[:, :-1][nonpad] == y[:, 1:][nonpad]), (
-                            "x[i,t] != y[i,t-1] for non-pad positions"
-                        )
+    Target posisi 0 tidak punya token sebelumnya sehingga tidak diperiksa.
+    Tidak ada `try/except` yang menelan `AssertionError`: kegagalan harus terlihat.
+    """
+    if tuple(x.shape) != tuple(y.shape):
+        raise AssertionError(f"x,y shape mismatch: {tuple(x.shape)} vs {tuple(y.shape)}")
+    if len(tuple(x.shape)) != 2:
+        raise AssertionError(f"x,y must be 2-D [B,T], got {tuple(x.shape)}")
+
+    import torch
+
+    if isinstance(x, torch.Tensor) and isinstance(y, torch.Tensor):
+        if y.shape[1] < 2:
             return
-    except Exception:
-        pass
-    # fallback for non-torch
-    if hasattr(x, "shape") and hasattr(y, "shape") and x.shape == y.shape:
-        B, T = x.shape[0], x.shape[1]
-        for b in range(B):
-            for t in range(1, T):
-                yt = y[b, t]
-                if yt == pad_id:
-                    continue
-                xtm1 = x[b, t - 1]
-                assert xtm1 == yt, f"x[{b},{t-1}] != y[{b},{t}] for non-pad"
+        source = x[:, 1:]
+        target = y[:, :-1]
+        nonpad = target != pad_id
+        if bool(nonpad.any()) and not torch.equal(source[nonpad], target[nonpad]):
+            bad = (source != target) & nonpad
+            b, t = (int(i) for i in bad.nonzero()[0].tolist())
+            raise AssertionError(
+                f"x[{b},{t + 1}] != y[{b},{t}] for non-pad target "
+                "(contract x[i,t] == y[i,t-1])"
+            )
+        return
+
+    B, T = int(x.shape[0]), int(x.shape[1])
+    for b in range(B):
+        for t in range(1, T):
+            if y[b, t] == pad_id:
+                continue
+            assert x[b, t] == y[b, t - 1], (
+                f"x[{b},{t}] != y[{b},{t - 1}] for non-pad target"
+            )
 
 
 def assert_causal_mask(mask: Any) -> None:

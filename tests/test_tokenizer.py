@@ -51,6 +51,38 @@ class TestTokenizerLeakage(unittest.TestCase):
         self.assertEqual(tokenizer.vocab_size, expected_size)
 
 
+class TestTokenizerFromVocab(unittest.TestCase):
+    """Jalur restore resmi dari checkpoint (F-D9-01)."""
+
+    def setUp(self):
+        self.fitted = Tokenizer()
+        self.fitted.fit(["presiden indonesia mengumumkan kebijakan baru", "jakarta cuaca cerah"])
+
+    def test_from_vocab_restores_both_mappings_and_size(self):
+        restored = Tokenizer.from_vocab(self.fitted.token_to_id)
+        self.assertEqual(restored.token_to_id, self.fitted.token_to_id)
+        self.assertEqual(restored.id_to_token, self.fitted.id_to_token)
+        self.assertEqual(restored.vocab_size, self.fitted.vocab_size)
+
+    def test_from_vocab_makes_decode_work(self):
+        restored = Tokenizer.from_vocab(self.fitted.token_to_id)
+        text = "presiden indonesia"
+        self.assertEqual(restored.decode(restored.encode(text)), text)
+
+    def test_from_vocab_keeps_special_token_ids(self):
+        restored = Tokenizer.from_vocab(self.fitted.token_to_id)
+        self.assertEqual(restored.encode("halo"), [3])
+        self.assertEqual(restored.decode([1, 2, 0]), "")
+
+    def test_from_vocab_rejects_empty_vocab(self):
+        with self.assertRaises(ValueError):
+            Tokenizer.from_vocab({})
+
+    def test_from_vocab_rejects_duplicate_ids(self):
+        with self.assertRaises(ValueError):
+            Tokenizer.from_vocab({"a": 4, "b": 4})
+
+
 class TestTokenizerOrder(unittest.TestCase):
     def test_encode_preserves_text_order(self):
         """encode mengembalikan id sesuai urutan kemunculan, bukan urutan vocab."""

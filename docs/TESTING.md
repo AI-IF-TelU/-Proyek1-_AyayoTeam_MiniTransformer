@@ -606,6 +606,49 @@ Gap cakupan yang masih ada: (a) restore checkpoint → `generate` non-kosong, (b
 `model.context_length != 64`, (c) penulisan/verifikasi metrics JSONL oleh `train()`,
 (d) `Tokenizer` tanpa `from_vocab`. Suite hijau tidak boleh dibaca sebagai penutupan gap ini.
 
+### Subtask D14 — Tutup temuan F-D9-01..06 dan F-D11-01
+
+Eksekusi: 2026-10-24 pada `master` @ `cd757da` + perubahan D14. Environment: Python 3.10.6,
+pytest 9.1.1, torch 2.14.1+cpu (`.venv`), CPU-only.
+
+Dokumen utama: **[`docs/D14_FIX_REPORT.md`](D14_FIX_REPORT.md)**. Ringkasan perubahan:
+
+| Temuan | Perubahan | Bukti |
+|---|---|---|
+| F-D9-01 | `Tokenizer.from_vocab(vocab)`; README §11 memakai jalur restore resmi | `test_tokenizer.py::TestTokenizerFromVocab` (5), `test_checkpoint_restore_contract.py` (2); probe checkpoint nyata: decode + generate non-kosong |
+| F-D9-02 | `generate(context_length=None)` → `getattr(model, "context_length", 64)` | `test_generate_context_contract.py` (4); probe `context_length=8` + `eos_id=-1` tidak `ValueError` |
+| F-D9-03 | tidak diubah (butuh keputusan koordinator + ADR) | perbandingan statis `TECH_SPEC.md:105` vs signature aktual |
+| F-D9-04 | hapus rujukan `ADR-014` di `src/train.py:31` | pemindaian `ADR-01[3-9]` di `src/` → kosong |
+| F-D9-05 | buat `docs/D1_Acceptance_Criteria_Matrix.md`, `D2_Testing_Framework.md`, `D3_Test_Structure.md` | ketiga berkas ada dan dirujuk |
+| F-D9-06 | README §11 menambahkan perintah `run_training.py` yang menghasilkan artefak dari clone; contoh memakai path yang dihasilkan perintah itu | jalur restore dijalankan pada checkpoint hasil `run_training.py` 1 epoch: decode + generate non-kosong |
+| F-D11-01 | `make_batch` arah kontrak §4; `assert_x_y_shift` tanpa `try/except` yang menelan `AssertionError` | `test_helpers_contract.py` (7); perbandingan dengan `TextDataset` nyata |
+| Gap Issue C #3 | `test_metrics_jsonl_contract.py` (3): satu baris JSONL per epoch, tanpa `metrics_path` tidak menulis, overwrite bukan append | `190 passed` suite penuh |
+
+Suite aktual D14:
+
+| Perintah | Output aktual |
+|---|---|
+| `python -m pytest -q` | `175 passed, 15 skipped in 37.04s` |
+| `python -m pytest -q --run-integration` | `190 passed in 42.35s` |
+| `python -m pytest -q -m integration --run-integration` | `15 passed, 175 deselected in 28.32s` |
+| `python -m pytest --collect-only -q --run-integration` | `190 tests collected in 14.17s` |
+| Modul A (6 berkas) | `36 passed in 17.97s` |
+| Modul B (6 berkas, `--run-integration`) | `90 passed in 25.96s` |
+| Modul C (10 berkas) | `49 passed in 31.00s` |
+| Helper (1 berkas) | `7 passed in 12.87s` |
+| Integrasi (2 berkas, `--run-integration`) | `8 passed in 27.24s` |
+
+Konsistensi: `36 + 90 + 49 + 7 + 8 = 190`; default `190 − 15 = 175`. Tidak ada `failed`, `error`,
+atau `xfail`.
+
+Perubahan file D14: `src/data/tokenizer.py`, `src/generate.py`, `src/train.py`, `tests/helpers.py`,
+`tests/test_tokenizer.py`, `tests/test_checkpoint_restore_contract.py` (baru),
+`tests/test_generate_context_contract.py` (baru), `tests/test_helpers_contract.py` (baru),
+`tests/test_metrics_jsonl_contract.py` (baru), `docs/D1_Acceptance_Criteria_Matrix.md` (baru),
+`docs/D2_Testing_Framework.md` (baru), `docs/D3_Test_Structure.md` (baru),
+`docs/D13_FINAL_REPORT.md` (perbarui §4.7 + §8.4), `docs/D14_FIX_REPORT.md` (baru),
+`docs/TESTING.md` (bagian ini), `README.md` §11, dan laporan AI D14.
+
 ## Catatan Teknis
 
 - Tidak ada penambahan dependency baru (pytest sudah terdaftar di `requirements.txt`).
