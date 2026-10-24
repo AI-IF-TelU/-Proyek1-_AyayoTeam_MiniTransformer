@@ -554,6 +554,58 @@ masih terbuka. Rincian ada di `D12_TESTING_REPORT.md` §6 dan `D9_FAILURE_LOG.md
 Perubahan file D12: `docs/D12_TESTING_REPORT.md` (baru), `docs/TESTING.md` (bagian ini),
 `README.md` §12, dan laporan AI `docs/ai-logs/reports/AI-LOG-rafasuryaputra-80048-IssueD-D12.md`.
 
+### Subtask D13 — Laporan akhir berbasis bukti
+
+Eksekusi: 2026-10-24 pada `master` @ `edbf5cc` (tanpa operasi Git). Environment: Python 3.10.6,
+pytest 9.1.1, torch 2.14.1+cpu (`.venv`), CPU-only. Tidak ada perubahan `src/`, `tests/`,
+`pytest.ini`, atau dependency.
+
+Dokumen utama: **[`docs/D13_FINAL_REPORT.md`](D13_FINAL_REPORT.md)**. Isinya:
+
+1. snapshot HEAD, environment, dan seluruh perintah runner yang dijalankan ulang pada `edbf5cc`;
+2. rekap acceptance criteria Issues #2–#6 dengan status TERVERIFIKASI / SEBAGIAN /
+   TIDAK TERVERIFIKASI / DI LUAR KENDALI, beserta nama tes yang diverifikasi ada di koleksi;
+3. ledger bukti subtask D1–D13;
+4. status temuan terbuka F-D9-01…06 dan F-D11-01 berdasarkan probe yang dijalankan di luar repo;
+5. hasil eksperimen C14 (dikutip, tidak dijalankan ulang) dan pemisahan tegas apa yang terbukti;
+6. audit bukti Issue E (laporan, ketersediaan raw, keterbacaan JSONL, pemindaian secret);
+7. errata terhadap `D12_TESTING_REPORT.md`, `D10_FIX_VERIFICATION.md`, dan `TESTING.md` §D8.
+
+Ringkasan status pada commit tersebut:
+
+| Perintah | Output aktual | Status |
+|---|---|---|
+| `python -m pytest -q` | `154 passed, 15 skipped in 22.08s` | PASS |
+| `python -m pytest -q --run-integration` | `169 passed in 23.38s` | PASS |
+| `python -m pytest -q -m integration --run-integration` | `15 passed, 154 deselected in 17.95s` | PASS |
+| `python -m pytest --collect-only -q --run-integration` | `169 tests collected in 8.49s` | OK |
+| Modul A (6 berkas) | `31 passed in 10.82s` | PASS |
+| Modul B (6 berkas, `--run-integration`) | `90 passed in 13.52s` | PASS |
+| Modul C (8 berkas, default / `--run-integration`) | `40 passed, 1 skipped` / `41 passed` | PASS |
+
+Run konfirmasi setelah perubahan dokumentasi D13: `python -m pytest -q --run-integration` →
+`169 passed in 28.32s`; `git status` hanya menampilkan berkas dokumentasi yang berubah.
+
+Bukti tambahan D13 (diukur ulang, bukan dikutip):
+
+- `DATASET_CARD.md` cocok persis: 720/80/200 artikel, 290.920/33.157/77.330 token, vocab 19.192;
+  0 id val/test di luar vocab train.
+- Seluruh 69 rujukan `file::Class::test` dan 26 rujukan `::test` pada matriks D12 ada di koleksi
+  `edbf5cc`.
+- Pemindaian sumber case-sensitive: tidak ada `nn.Transformer*`, `MultiheadAttention`,
+  `torch.transformer`, atau `F.multi_head_attention_forward` di `src/`.
+- `git log -- src` menunjukkan commit terakhir yang menyentuh `src/` adalah `4c7d670` (sebelum D9).
+
+Temuan yang **tetap terbuka** dan tidak ditutup D13: F-D9-01 (restore checkpoint → `generate`
+kosong), F-D9-02 (`context_length=64` hardcode), F-D9-03 (signature ≠ `TECH_SPEC.md` §6), F-D9-04
+(`ADR-014` tidak ada), F-D9-05 (artefak D1/D2/D3 tidak ada), F-D9-06 (artefak contoh README tidak
+ada), F-D11-01 (arah shift di `tests/helpers.py`). Rincian dan bukti probe ada di
+`D13_FINAL_REPORT.md` §4.
+
+Gap cakupan yang masih ada: (a) restore checkpoint → `generate` non-kosong, (b) `generate` dengan
+`model.context_length != 64`, (c) penulisan/verifikasi metrics JSONL oleh `train()`,
+(d) `Tokenizer` tanpa `from_vocab`. Suite hijau tidak boleh dibaca sebagai penutupan gap ini.
+
 ## Catatan Teknis
 
 - Tidak ada penambahan dependency baru (pytest sudah terdaftar di `requirements.txt`).

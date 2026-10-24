@@ -339,7 +339,10 @@ pytest 9.1.1, torch 2.14.1+cpu, CPU-only):
 - Rincian perintah, matriks kontrak→test→status (`TECH_SPEC.md` §3–§7), matriks acceptance
   criteria Issues #2–#6, hasil integrasi, riwayat debugging, dan hasil eksperimen:
   [`docs/D12_TESTING_REPORT.md`](docs/D12_TESTING_REPORT.md).
-- Riwayat eksekusi per subtask D2–D11: [`docs/TESTING.md`](docs/TESTING.md).
+- **Laporan akhir berbasis bukti** (rekap acceptance criteria Issues #2–#6, ledger D1–D13, status
+  temuan terbuka, audit logging Issue E) pada `master @ edbf5cc`:
+  [`docs/D13_FINAL_REPORT.md`](docs/D13_FINAL_REPORT.md).
+- Riwayat eksekusi per subtask D2–D13: [`docs/TESTING.md`](docs/TESTING.md).
 - Log kegagalan dan bukti reproduksinya: [`docs/D9_FAILURE_LOG.md`](docs/D9_FAILURE_LOG.md);
   verifikasi perbaikan: [`docs/D10_FIX_VERIFICATION.md`](docs/D10_FIX_VERIFICATION.md).
 - Laporan eksperimen training 4 epoch: [`docs/ai-logs/reports/AI-LOG-C14-experiment.md`](docs/ai-logs/reports/AI-LOG-C14-experiment.md).
