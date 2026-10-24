@@ -372,6 +372,64 @@ akan memerahkan suite bersama sebelum pemilik modul memperbaiki serta sebelum ad
 (perbaikan kode modul berada di luar scope D9 per Issue D §4, dan §9 meminta berhenti lalu melapor).
 Usulan tes regresi per temuan sudah dicantumkan di `docs/D9_FAILURE_LOG.md` untuk dipakai pada D10/D11.
 
+### Subtask D10 — Verifikasi perbaikan berdasarkan tes aktual
+
+Eksekusi: 2026-10-24 20:51–21:03 WIB pada `master` @ `b5c2b80`, tanpa perubahan `src/`,
+`tests/`, `README.md`, atau kontrak publik. Environment: Python 3.10.6, pytest 9.1.1,
+torch 2.14.1+cpu (`.venv`), CPU-only.
+
+Bukti lengkap (perintah, output aktual, kontrol negatif, kriteria penutupan) ada di
+[`docs/D10_FIX_VERIFICATION.md`](D10_FIX_VERIFICATION.md). Bagian ini hanya ringkasan.
+
+#### Prasyarat D10 belum terpenuhi
+
+D10 berbunyi "setelah pemilik modul memperbaiki". Pada `b5c2b80` belum ada perbaikan:
+`git diff --stat b5c2b80 HEAD -- src tests README.md` kosong, commit terakhir yang menyentuh
+`src/` adalah `4c7d670` (sebelum D9), `Tokenizer.from_vocab` tidak ada, dan
+`inspect.signature(generate).parameters["context_length"].default` masih `64`.
+
+Dengan persetujuan anggota, D10 dijalankan sebagai **verification attempt**: seluruh probe D9
+dijalankan ulang untuk mencatat status aktual. Hasil: **0 dari 6 temuan tertutup**.
+
+#### Baseline suite (masih hijau pada commit yang sama)
+
+| Perintah | Output aktual | Status |
+|---|---|---|
+| `python -m pytest -q` | `162 passed in 26.37s` | PASS |
+| `python -m pytest -q --run-integration` | `162 passed in 24.90s` | PASS (identik) |
+| `python -m pytest -q` (setelah seluruh probe) | `162 passed in 25.08s` | PASS |
+
+#### Status temuan
+
+| ID | Status D10 | Bukti ringkas |
+|---|---|---|
+| F-D9-01 | OPEN | restore README → `id_to_token 0`, `vocab_size 0`, `decode ''`, `generate ''`; kontrol (pemetaan diisi) berfungsi; `MiniGPT(vocab_size=0)` → `ValueError`; gejala identik pada checkpoint nyata (vocab 3.981) |
+| F-D9-02 | OPEN | default `context_length=64`; model `context_length=8` → `ValueError: sequence length T=9 exceeds context_length=8`; kontrol eksplisit berfungsi |
+| F-D9-03 | OPEN | spec 2 parameter vs implementasi 7 parameter; keduanya tidak berubah sejak D9 |
+| F-D9-04 | OPEN | `src/train.py:31` masih merujuk `ADR-014`; ADR hanya 001–012 |
+| F-D9-05 | OPEN | tiga dokumen yang diklaim laporan D1 tetap `Test-Path` `False` |
+| F-D9-06 | OPEN | `outputs/` tidak ada di working tree |
+
+#### Penajaman: F-D9-02 intermiten
+
+D9 melaporkan guard terpicu pada token ke-7. D10 menguji 10 seed: **7/10 seed melempar
+`ValueError`**, sedangkan 3/10 berhenti lebih dulu karena `<eos>` (seed 2, 6, 7). Jadi reprouksi
+D9 valid tetapi tidak deterministik. Tes regresi untuk temuan ini wajib menetralkan `<eos>`
+(mis. `eos_id=-1`); jika tidak, tes menjadi flaky dan bisa lolos palsu.
+
+#### Gap cakupan yang membuat suite tetap hijau
+
+Empat pemeriksaan cakupan masih `False` pada `tests/`: (1) `generate()` dengan tokenizer hasil
+restore, (2) `generate()` dengan `context_length != 64`, (3) `max_new_tokens=0`, (4) MiniGPT
+`context_length != 64` + generate. Karena itu `162 passed` tidak membantah F-D9-01/F-D9-02.
+
+#### Catatan tentang unit test
+
+D10 tidak menambahkan file tes ke `tests/`: persetujuan yang diberikan adalah *verification
+attempt* tanpa memerahkan suite bersama, dan menambahkan tes yang mengunci perilaku buggy akan
+melegalkan bug. Dua tes regresi kandidat (dengan `<eos>` dinetralkan) sudah ditulis lengkap di
+`docs/D10_FIX_VERIFICATION.md` §12 untuk dipakai pada D11 setelah modul diperbaiki.
+
 ## Catatan Teknis
 
 - Tidak ada penambahan dependency baru (pytest sudah terdaftar di `requirements.txt`).
