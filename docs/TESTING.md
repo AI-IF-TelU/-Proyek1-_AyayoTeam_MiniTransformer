@@ -193,6 +193,80 @@ Output aktual: `144 passed in 16.26s` (117 tes sebelum D6 + 27 tes baru). Subset
 `tests/helpers.py::make_model("minigpt")` sebelumnya meneruskan `d_ff` ke `MiniGPT`, yang tidak memiliki parameter tersebut (`TypeError: MiniGPT.__init__() got an unexpected keyword argument 'd_ff'`), sehingga helper tidak pernah bisa membuat MiniGPT. Perbaikan: argumen `d_ff` tidak diteruskan; nilai `d_ff` memang ditetapkan internal `4 * d_model` (TECH_SPEC §6). Verifikasi: `make_model('minigpt')` → `MiniGPT 2 256 torch.Size([100, 64])`. Tidak ada perubahan kontrak `src/`.
 
 
+### Subtask D7 — Tes training step, loss, dan pembaruan parameter
+
+Perintah:
+
+```powershell
+python -m pytest tests/test_training_contract.py -v
+```
+
+Output aktual: `18 passed in 14.66s` (Python 3.10.6, pytest 9.1.1, torch 2.14.1+cpu).
+
+File baru `tests/test_training_contract.py` melengkapi `tests/test_training_step.py` milik Issue C (subtask C8) — file pemilik modul tidak diubah. Model uji: `MiniGPT(vocab_size=16, n_layers=2, n_heads=2, d_model=8, context_length=8, dropout=0.0)`; batch `x, y [2, 6]` yang konsisten dengan `TECH_SPEC.md` §4 (`y[:,0]` pad, `x[i,t] == y[i,t-1]` pada posisi non-pad, pad trailing).
+
+`TestTrainingStepLoss` (4 tes):
+
+- `test_batch_is_contract_consistent_before_use` — batch uji benar-benar memenuhi relasi shift §4 sebelum dipakai sebagai bukti.
+- `test_training_step_returns_finite_python_float` — mengembalikan `float` Python dan finite.
+- `test_returned_loss_matches_cross_entropy_of_step_logits` — forward hook menangkap logits step itu; loss yang dikembalikan sama dengan `F.cross_entropy(flat logits, flat y, ignore_index=pad_id)`. Kontrol: tanpa `ignore_index` nilainya berbeda, sehingga tes sensitif.
+- `test_returned_loss_is_detached_from_graph` — nilai balik berupa skalar Python, bukan tensor ber-grad.
+
+`TestPadTargetIgnoredInLoss` (4 tes):
+
+- `test_perturbing_pad_row_logits_does_not_change_loss` — logits kelas target pada baris `pad_id` diturunkan ekstrem (`-100`) dan loss tetap identik eksak. Kontrol anti-vakum: dengan `ignore_index=-100` perturbasi yang sama mengubah loss.
+- `test_perturbing_nonpad_row_logits_changes_loss` — kontrol sensitivitas pada baris non-pad.
+- `test_custom_pad_id_is_ignored_too` — `pad_id=5` diabaikan dengan nilai sama seperti `ignore_index=5` manual, dan berbeda dari criterion default `pad_id=0` → `pad_id` benar-benar diparameterkan.
+- `test_gradient_is_zero_at_pad_target_positions` — `logits.grad` tepat nol pada posisi target pad dan nonzero pada posisi non-pad → pad tidak mengalir ke pembaruan parameter.
+
+`TestParameterUpdate` (7 tes):
+
+- `test_every_trainable_parameter_changes_after_one_step` — seluruh `named_parameters()` berubah dan finite setelah satu step AdamW.
+- `test_zero_lr_control_leaves_parameters_unchanged` — kontrol negatif `lr=0`: parameter identik bitwise.
+- `test_optimizer_records_one_step_for_all_parameters` — state optimizer mencakup semua parameter dengan `step == 1`.
+- `test_second_step_advances_optimizer_state` — step kedua menaikkan counter dan mengubah parameter lagi.
+- `test_model_is_in_train_mode_after_step` — `training_step` memanggil `model.train()` (dari kondisi `eval()`).
+- `test_overfitting_one_batch_reduces_loss` — 25 step pada batch tetap menurunkan loss (arah optimisasi benar).
+- (kontrol negatif di atas melengkapi bukti bahwa perubahan berasal dari `optimizer.step()`).
+
+`TestTrainingReproducibility` (2 tes):
+
+- `test_seed_42_reproduces_loss_and_parameters` — dua run dengan `set_seed(42)` dan dropout `0.1` menghasilkan loss identik dan parameter identik → kontrak seed §6.
+- `test_different_seed_reproduces_differently_with_dropout` — kontrol: seed 7 menghasilkan loss dan parameter berbeda.
+
+`TestTrainingStepGuards` (2 tes):
+
+- `test_context_length_guard_applies_and_keeps_parameters` — `T=9 > context_length=8` melempar `ValueError` lewat jalur training, parameter tidak berubah, dan state optimizer tetap kosong.
+- `test_error_and_pad_only_target_relationship_is_documented` — keterbatasan terdokumentasi: target seluruhnya `pad_id` menghasilkan loss `nan` (perilaku `nn.CrossEntropyLoss(ignore_index=...)` bila tidak ada target yang dihitung). `training_step` tidak memiliki guard dan `TECH_SPEC.md` §5 tidak mengaturnya; tes ini mencatat perilaku aktual, bukan menetapkan kontrak baru.
+
+#### Debugging aktual D7
+
+Run pertama (`python -m pytest tests/test_training_contract.py -v`): `2 failed, 16 passed in 16.68s`.
+
+1. `test_perturbing_nonpad_row_logits_changes_loss` gagal dengan pesan `AssertionError: tensor(True) is not false`. Penyebab: perturbasi `+= 100.0` diterapkan ke **semua kelas** sehingga hanya menggeser logits secara seragam; softmax invarian terhadap pergeseran seragam, jadi loss tidak berubah. Ini juga berarti asersi pasangan (baris pad) berpotensi lolos palsu. Perbaikan: perturbasi diarahkan ke satu kelas (kelas target pad untuk baris pad, kelas non-target untuk baris non-pad) dan ditambahkan kontrol anti-vakum memakai `ignore_index=-100`.
+2. `test_context_length_guard_applies_and_keeps_parameters` gagal dengan `AssertionError: 7 != 9`. Penyebab: batch uji memiliki `T=6`, lalu ditambah satu kolom menjadi 7 — belum melewati `context_length=8`. Perbaikan: batch guard dibuat eksplisit `T = context_length + 1 = 9`.
+
+Setelah perbaikan: `18 passed in 14.66s`. Tidak ada perubahan `src/`, kontrak, atau dependency.
+
+#### Kontrol negatif (verifikasi tes tidak lolos palsu)
+
+Skrip sementara di luar repo (`%TEMP%\kilo\d7_mutation_check.py`) menjalankan `training_step` yang sama dengan `ignore_index` berbeda. Output aktual:
+
+```text
+ignore_index=pad(0)    pad affects loss: False  pad grad zero: True
+ignore_index=-100      pad affects loss: True   pad grad zero: False
+```
+
+Artinya asersi "posisi pad diabaikan di loss" dan "gradien nol di posisi pad" benar-benar bergantung pada `ignore_index=pad_id` (gagal bila masking dihilangkan). `src/` tidak diubah permanen.
+
+Seluruh suite setelah D7:
+
+```powershell
+python -m pytest -q
+```
+
+Output aktual: `162 passed in 22.63s` (144 tes sebelum D7 + 18 tes baru). Subset regresi training: `python -m pytest tests/test_training_step.py tests/test_training_contract.py tests/test_train_integration.py tests/test_checkpoint.py -q` → `21 passed in 16.02s`. Run dengan `--run-integration` → `162 passed in 20.96s`.
+
 ## Catatan Teknis
 
 - Tidak ada penambahan dependency baru (pytest sudah terdaftar di `requirements.txt`).
