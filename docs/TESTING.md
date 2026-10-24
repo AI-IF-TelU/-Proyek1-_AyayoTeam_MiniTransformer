@@ -27,7 +27,7 @@ Marker `integration` dilewati secara default oleh `conftest.py` kecuali menjalan
 python -m pytest -q
 ```
 
-Hasil aktual (sesuai versi yang tersedia): **117 passed** setelah D5 (103 passed sebelum D5; torch 2.14.1+cpu via `.venv`).
+Snapshot historis (D5, bukan status terkini): **117 passed** setelah D5 (103 passed sebelum D5; torch 2.14.1+cpu via `.venv`). Status terbaru yang benar-benar dijalankan ada pada bagian **Subtask D8 — Status tes lintas modul**.
 
 ### Subset per modul
 
@@ -49,7 +49,9 @@ python -m pytest tests/test_positional_encoding.py tests/test_attention.py tests
 python -m pytest -q --run-integration
 ```
 
-Tes integrasi menunggu modul dari Issues A, B, dan C tersedia. Jika modul belum tersedia, collection akan gagal dengan `ImportError` — bukan kegagalan tes.
+Modul dari Issues A, B, dan C sudah tersedia, sehingga seluruh tes dikoleksi tanpa `ImportError`.
+
+Catatan status (D8, terverifikasi): penanda `integration` terdaftar di `pytest.ini` dan mekanisme skip-nya ada di `tests/conftest.py`, tetapi **belum ada satu pun tes yang memakai `@pytest.mark.integration`**. Akibatnya `-q --run-integration` menjalankan 162 tes yang sama dengan `-q` biasa. Penandaan tes integrasi yang sesungguhnya belum diputuskan dan berada di luar scope D8 (kandidat: D11).
 
 ## Hasil Verifikasi Aktual
 
@@ -266,6 +268,58 @@ python -m pytest -q
 ```
 
 Output aktual: `162 passed in 22.63s` (144 tes sebelum D7 + 18 tes baru). Subset regresi training: `python -m pytest tests/test_training_step.py tests/test_training_contract.py tests/test_train_integration.py tests/test_checkpoint.py -q` → `21 passed in 16.02s`. Run dengan `--run-integration` → `162 passed in 20.96s`.
+
+### Subtask D8 — Status tes lintas modul (eksekusi aktual)
+
+Eksekusi: 2026-10-24 19:40–19:47 WIB pada `master` @ `ffc5372`, tanpa perubahan pada `src/` maupun file tes. Environment: Python 3.10.6, pytest 9.1.1, torch 2.14.1+cpu (`.venv`), CPU-only, Windows PowerShell.
+
+Seluruh modul Issue A, B, dan C sudah tersedia di repository, sehingga eksekusi dijalankan atas kode nyata (bukan stub) dan tidak ada `ImportError` saat koleksi. D8 tidak menambah tes baru; ia menjalankan suite yang sudah ada dan mencatat hasil aktual per modul.
+
+#### Ringkasan grup
+
+| Grup | File tes | Tes | Command (dirangkum) | Output aktual | Status |
+|---|---|---:|---|---|---|
+| Modul A — data pipeline & tokenizer | 6 | 31 | `python -m pytest tests/test_tokenizer.py tests/test_data_pipeline.py tests/test_dataloader.py tests/test_sliding_window.py tests/test_bos_eos.py tests/test_data_split.py -v` | `31 passed in 12.61s` | PASS |
+| Modul B — komponen inti transformer | 6 | 90 | `python -m pytest tests/test_positional_encoding.py tests/test_attention.py tests/test_causal_masking.py tests/test_decoder_block.py tests/test_decoder_block_contract.py tests/test_integration_components.py -v` | `90 passed in 20.52s` | PASS |
+| Modul C — MiniGPT, training, generation | 8 | 41 | `python -m pytest tests/test_minigpt_logits.py tests/test_minigpt_mock.py tests/test_minigpt_contract.py tests/test_training_step.py tests/test_training_contract.py tests/test_checkpoint.py tests/test_generation_stop.py tests/test_train_integration.py -v` | `41 passed in 20.44s` | PASS |
+| Suite penuh | 20 | 162 | `python -m pytest -q` | `162 passed in 23.53s` | PASS |
+| Suite + mode integrasi | 20 | 162 | `python -m pytest -q --run-integration` | `162 passed in 23.57s` | PASS (identik, lihat keterbatasan 1) |
+
+Konsistensi: `31 + 90 + 41 = 162` sama dengan jumlah tes yang dikoleksi suite penuh. Tidak ada `failed`, `error`, `skipped`, atau `xfail` pada kelima run.
+
+#### Rincian per file (jumlah tes aktual hasil koleksi)
+
+| Modul | File | Tes | Perilaku yang dibuktikan |
+|---|---|---:|---|
+| A | `test_tokenizer.py` | 6 | id special 0–3, lowercase + regex `\w+\|[^\w\s]`, fallback `<unk>`, urutan id mengikuti teks, `vocab_size = 4 + token unik train`, tanpa vocab leakage (train vs val/test) |
+| A | `test_data_pipeline.py` | 17 | `x[i,t] == y[i,t-1]`, padding hanya di kanan + dtype `int64`, jumlah window `L-64` stride 1, tidak ada window lintas dokumen, dokumen kosong/1 token dibuang, `decode` melewati special |
+| A | `test_dataloader.py` | 2 | batch `[B, 64]` lewat collate `pad_id=0`, teks lebih panjang dari konteks |
+| A | `test_sliding_window.py` | 3 | dokumen panjang/pendek, no cross-document leak, dokumen kosong dan pendek |
+| A | `test_bos_eos.py` | 1 | `<bos>`/`<eos>` disisipkan sebagai id setelah tokenisasi |
+| A | `test_data_split.py` | 2 | normalisasi teks; split 720/80/200 seed 42 dan nol irisan train/val/test dari berkas `data/raw` nyata |
+| B | `test_positional_encoding.py` | 16 | shape `[B,T,d]`, buffer `pe` non-trainable, rumus sin/cos, `ValueError` saat `T > max_len`, offset sama tiap item batch, gradien identitas |
+| B | `test_attention.py` | 28 | shape proyeksi Q/K/V/O, skala `1/sqrt(head_dim)`, mask segitiga atas `-inf`, invariance causal + kontrol `test_invariance_fails_without_mask`, `ValueError` saat `d_model % n_heads != 0` |
+| B | `test_causal_masking.py` | 8 | invariance per titik potong, probabilitas masa depan tepat 0, posisi 0 hanya ke diri sendiri, `T=1`, float64, skor besar tetap finite |
+| B | `test_decoder_block.py` | 18 | FFN GELU + shape `d_ff`, pre/post-norm manual, residual, dropout train vs eval, gradien ke seluruh parameter |
+| B | `test_decoder_block_contract.py` | 13 | pre-norm baseline, residual aditif (parameter nol → `out == x`), gradien identitas, causality menembus block, tanpa guard `context_length` |
+| B | `test_integration_components.py` | 7 | PE → MHA → DecoderBlock sebagai satu alur, gradient flow, tidak ada `nn.Transformer*`/`nn.MultiheadAttention` pada jalur inti |
+| C | `test_minigpt_logits.py` | 2 | logits `[B,T,V]` float32, `ValueError` saat `T > context_length` |
+| C | `test_minigpt_mock.py` | 2 | alur `[B,T] -> [B,T,V]` dengan stub (by design C4, bukan bukti integrasi komponen nyata) |
+| C | `test_minigpt_contract.py` | 14 | struktur 2 block, LM head tidak di-tie, buffer `pos_enc.pe`, guard `context_length` terkonfigurasi, causality end-to-end, PE benar-benar dipakai, semua parameter bergradien |
+| C | `test_training_step.py` | 1 | satu step memperbarui parameter |
+| C | `test_training_contract.py` | 18 | loss = CE manual dengan `ignore_index=pad_id`, baris pad tidak memengaruhi loss/gradien, semua parameter berubah, kontrol `lr=0`, seed 42 reproduktif |
+| C | `test_checkpoint.py` | 1 | roundtrip `state_dict` + `vocab` + `config` |
+| C | `test_generation_stop.py` | 2 | berhenti pada `<eos>` dan pada `max_new_tokens` |
+| C | `test_train_integration.py` | 1 | `Tokenizer` + `TextDataset` + `create_dataloader` + `train` nyata (Issue A) dalam satu epoch, train/val loss finite |
+
+#### Keterbatasan yang tercatat pada D8
+
+1. **Penanda `integration` belum dipakai satu tes pun.** `pytest.ini` mendaftarkan marker dan `tests/conftest.py` menyediakan mekanisme skip, tetapi tidak ada `@pytest.mark.integration` di `tests/`. Bukti: `-q` dan `-q --run-integration` sama-sama `162 passed` dengan daftar tes identik. Penandaan yang benar menuntut perubahan file tes dan berada di luar scope D8 (kandidat D11).
+2. **`test_minigpt_mock.py` bukan bukti integrasi.** Tes ini sengaja memakai stub (subtask C4). Rangkaian komponen nyata dibuktikan `test_minigpt_contract.py` (14 tes) dan `test_integration_components.py` (7 tes).
+3. **`test_data_split.py::test_splits_and_leakage` bergantung pada berkas data.** Tes membaca `data/raw/*.jsonl` (tracked) dan menulis ulang `data/processed/*.jsonl`. Setelah run, `git status` tetap bersih, jadi hasil split deterministik (seed 42); namun bila berkas `data/raw/` hilang, tes gagal `FileNotFoundError`, bukan gagal kontrak.
+4. **Belum ada eksekusi penuh atas `data/processed/` (720/80/200)** maupun pemuatan checkpoint eksperimen C14 di dalam suite. Cakupan integrasi data nyata end-to-end dijadwalkan D11.
+5. **Durasi bervariasi antarrun.** Angka di atas adalah output run D8; run lain pada mesin yang sama mencatat durasi berbeda (mis. modul A 10.95s–12.61s) tanpa perubahan hasil.
+6. **CPU-only.** Tidak ada uji CUDA, mixed precision, atau multi-GPU. Versi dependency di luar environment ini tidak diverifikasi.
 
 ## Catatan Teknis
 
