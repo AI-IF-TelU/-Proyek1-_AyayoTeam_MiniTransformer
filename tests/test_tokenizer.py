@@ -50,5 +50,27 @@ class TestTokenizerLeakage(unittest.TestCase):
         expected_size = 4 + 6
         self.assertEqual(tokenizer.vocab_size, expected_size)
 
+
+class TestTokenizerOrder(unittest.TestCase):
+    def test_encode_preserves_text_order(self):
+        """encode mengembalikan id sesuai urutan kemunculan, bukan urutan vocab."""
+        tokenizer = Tokenizer()
+        tokenizer.fit(["b a c"])
+        encoded = tokenizer.encode("c a b b")
+        expected = [
+            tokenizer.token_to_id["c"],
+            tokenizer.token_to_id["a"],
+            tokenizer.token_to_id["b"],
+            tokenizer.token_to_id["b"],
+        ]
+        self.assertEqual(encoded, expected)
+
+    def test_vocab_size_equals_specials_plus_unique_train_tokens(self):
+        """vocab_size = 4 special token + jumlah token unik train."""
+        tokenizer = Tokenizer()
+        tokenizer.fit(["halo dunia halo", "dunia tes"])
+        # unik: halo, dunia, tes -> 3 + 4 = 7
+        self.assertEqual(tokenizer.vocab_size, 4 + 3)
+
 if __name__ == "__main__":
     unittest.main()
