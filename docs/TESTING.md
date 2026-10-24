@@ -321,6 +321,57 @@ Konsistensi: `31 + 90 + 41 = 162` sama dengan jumlah tes yang dikoleksi suite pe
 5. **Durasi bervariasi antarrun.** Angka di atas adalah output run D8; run lain pada mesin yang sama mencatat durasi berbeda (mis. modul A 10.95s–12.61s) tanpa perubahan hasil.
 6. **CPU-only.** Tidak ada uji CUDA, mixed precision, atau multi-GPU. Versi dependency di luar environment ini tidak diverifikasi.
 
+### Subtask D9 — Identifikasi error dan bukti reproduksi
+
+Eksekusi: 2026-10-24 19:58–20:11 WIB pada `master` @ `266c611`, tanpa perubahan `src/`, file tes,
+atau kontrak publik. Environment: Python 3.10.6, pytest 9.1.1, torch 2.14.1+cpu (`.venv`), CPU-only.
+
+Bukti lengkap (perintah, output/traceback, langkah reproduksi, pemilik, status) ada di
+[`docs/D9_FAILURE_LOG.md`](D9_FAILURE_LOG.md). Bagian ini hanya ringkasan.
+
+#### Baseline ulang
+
+| Perintah | Output aktual | Status |
+|---|---|---|
+| `python -m pytest -q` | `162 passed in 24.32s` | PASS |
+| `python -m pytest -q --run-integration` | `162 passed in 27.59s` | PASS (identik) |
+| Modul A (6 file) | `31 passed in 12.74s` | PASS |
+| Modul B (6 file) | `90 passed in 19.49s` | PASS |
+| Modul C (8 file) | `41 passed in 21.76s` | PASS |
+
+**Tidak ada kegagalan suite pada baseline.** Karena itu D9 menelusuri jalur yang tidak dicakup
+suite dan mereproduksinya di luar repo (`%TEMP%\kilo\d9\`), bukan mengandalkan status hijau suite.
+
+#### Temuan (ringkas)
+
+| ID | Severity | Ringkasan | Pemilik | Bukti |
+|---|---|---|---|---|
+| F-D9-01 | Tinggi (silent) | Restore checkpoint sesuai `README.md:276-286` menyisakan `id_to_token` kosong dan `vocab_size=0` → `generate()` = `''` tanpa error | C (+A) | R1, R3b |
+| F-D9-02 | Sedang | `src/generate.py:8` memakai `context_length=64` hardcode → `ValueError: sequence length T=9 exceeds context_length=8` untuk model `context_length=8` | C | R2 |
+| F-D9-03 | Sedang (kontrak) | Signature `generate` berbeda dari `TECH_SPEC.md:105` | C + koordinator | statis + R2 |
+| F-D9-04 | Rendah | `src/train.py:31` merujuk ADR-014 yang tidak ada | C / dokumen | statis |
+| F-D9-05 | Rendah | Laporan D1 mengklaim 3 dokumen `docs/` yang tidak ada (sudah dilaporkan di D5) | D | statis |
+| F-D9-06 | Rendah | README menunjuk `outputs/metrics/full/minigpt_c14.pt` yang tidak ada di repo/working tree | C / D | statis |
+
+Kontrol negatif dipakai agar temuan tidak lolos palsu: F-D9-01 dikontrol dengan tokenizer yang
+`id_to_token`-nya diisi (decode kembali `'presiden indonesia'`, generate non-kosong); F-D9-02
+dikontrol dengan `context_length=model.context_length` (berjalan normal) dan R2b menunjukkan
+sliding window baseline (64) tetap bekerja untuk prompt 100 token.
+
+#### Mengapa suite hijau tetapi ada defect
+
+| Gap cakupan | Bukti |
+|---|---|
+| Tidak ada tes restore tokenizer dari checkpoint → `generate` | `tests/test_checkpoint.py:12-23` hanya memeriksa `state_dict`/`vocab`/`config` |
+| Generation diuji dengan stub model & stub tokenizer | `tests/test_generation_stop.py:8-28` |
+| Tidak ada tes `generate` pada `model.context_length != 64` | seluruh tes generation memakai 64 |
+| Tidak ada tes `max_new_tokens=0` | perilaku aktual: mengembalikan prompt saja |
+
+D9 tidak menambah file tes: tes yang mengunci perilaku buggy akan melegalkan bug, dan tes yang gagal
+akan memerahkan suite bersama sebelum pemilik modul memperbaiki serta sebelum ada keputusan
+(perbaikan kode modul berada di luar scope D9 per Issue D §4, dan §9 meminta berhenti lalu melapor).
+Usulan tes regresi per temuan sudah dicantumkan di `docs/D9_FAILURE_LOG.md` untuk dipakai pada D10/D11.
+
 ## Catatan Teknis
 
 - Tidak ada penambahan dependency baru (pytest sudah terdaftar di `requirements.txt`).
