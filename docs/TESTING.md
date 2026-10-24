@@ -27,7 +27,7 @@ Marker `integration` dilewati secara default oleh `conftest.py` kecuali menjalan
 python -m pytest -q
 ```
 
-Snapshot historis (D5, bukan status terkini): **117 passed** setelah D5 (103 passed sebelum D5; torch 2.14.1+cpu via `.venv`). Status terbaru yang benar-benar dijalankan ada pada bagian **Subtask D8 — Status tes lintas modul**.
+Snapshot historis (D5, bukan status terkini): **117 passed** setelah D5 (103 passed sebelum D5; torch 2.14.1+cpu via `.venv`). Status terkini yang benar-benar dijalankan ada pada bagian **Subtask D12** di bawah dan pada [`docs/D12_TESTING_REPORT.md`](D12_TESTING_REPORT.md) §1.3.
 
 ### Subset per modul
 
@@ -511,6 +511,48 @@ kandidat tetap disimpan di `docs/D10_FIX_VERIFICATION.md` §12 dan belum dimasuk
    bobot hasil training nyata tidak dipakai untuk menguji aturan berhenti.
 5. `test_data_split.py` masih menulis ulang `data/processed/` dan tetap tanpa marker
    `integration` (perilakunya sudah dicatat sebagai keterbatasan D8 nomor 3).
+
+### Subtask D12 — Dokumentasi pengujian dan hasil eksperimen
+
+Eksekusi: 2026-10-24 pada `master` @ `4dbe3a2` (tanpa operasi Git). Environment: Python 3.10.6,
+pytest 9.1.1, torch 2.14.1+cpu (`.venv`), CPU-only. Tidak ada perubahan `src/`, `tests/`,
+`pytest.ini`, atau dependency.
+
+Dokumen konsolidasi: **[`docs/D12_TESTING_REPORT.md`](D12_TESTING_REPORT.md)**. Isinya:
+
+1. perintah runner dan status suite aktual (default, `--run-integration`, `-m integration`,
+   per modul) beserta rekonsiliasi jumlah tes;
+2. matriks kontrak → test → status untuk `TECH_SPEC.md` §3–§7, dengan nama
+   `file::TestClass::test_name` untuk kontrak wajib (vocab leakage, no-window-crossing,
+   causal mask, padding + `ignore_index`, stop generation, checkpoint roundtrip);
+3. matriks acceptance criteria Issues #2–#6 → bukti → status;
+4. hasil integrasi lintas modul (15 tes ber-marker `integration`);
+5. riwayat debugging D4–D11 beserta penyebab dan perbaikan;
+6. hasil eksperimen C14 (dikutip dari laporan C14, bukan dijalankan ulang);
+7. temuan terbuka dan gap cakupan.
+
+Ringkasan status pada commit tersebut:
+
+| Perintah | Output aktual | Status |
+|---|---|---|
+| `python -m pytest -q` | `154 passed, 15 skipped in 21.54s` | PASS |
+| `python -m pytest -q --run-integration` | `169 passed in 22.67s` | PASS |
+| `python -m pytest -q -m integration --run-integration` | `15 passed, 154 deselected in 16.48s` | PASS |
+| `python -m pytest --collect-only -q --run-integration` | `169 tests collected in 10.33s` | OK |
+
+Rekonsiliasi: Modul A 31 tes, Modul B 90 tes (7 di antaranya `integration`), Modul C 40 tes,
+`test_train_integration.py` 1 tes, `test_end_to_end_pipeline.py` 7 tes → total 169; default
+169 − 15 = 154. Durasi pada tabel adalah output run D12 dan bervariasi antarrun; yang stabil
+hanya jumlah pass/skip.
+
+Catatan penting: suite hijau **tidak** berarti seluruh kontrak tertutup. F-D9-01 (restore
+checkpoint → `generate` kosong), F-D9-02 (`generate` memakai `context_length=64` hardcode),
+F-D9-03 (signature `generate` ≠ `TECH_SPEC.md` §6), F-D9-04 (`ADR-014` tidak ada), F-D9-06
+(artefak contoh README tidak ada di repo), dan F-D11-01 (`helpers.make_batch` arah shift terbalik)
+masih terbuka. Rincian ada di `D12_TESTING_REPORT.md` §6 dan `D9_FAILURE_LOG.md`.
+
+Perubahan file D12: `docs/D12_TESTING_REPORT.md` (baru), `docs/TESTING.md` (bagian ini),
+`README.md` §12, dan laporan AI `docs/ai-logs/reports/AI-LOG-rafasuryaputra-80048-IssueD-D12.md`.
 
 ## Catatan Teknis
 

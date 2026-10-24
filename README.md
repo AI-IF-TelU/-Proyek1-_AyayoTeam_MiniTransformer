@@ -310,7 +310,8 @@ Perintah menjalankan seluruh suite:
 python -m pytest -q
 ```
 Tes integrasi lintas modul (tokenizer → dataset → model → loss → generation) ditandai
-`@pytest.mark.integration` dan dilewati secara default. Jalankan bersama seluruh suite dengan:
+`@pytest.mark.integration` dan dilewati secara default (tampil sebagai `skipped`, bukan hilang
+dari hitungan). Jalankan bersama seluruh suite dengan:
 ```
 python -m pytest -q --run-integration
 ```
@@ -323,3 +324,30 @@ Subset per modul:
 python -m pytest tests/test_tokenizer.py -q
 ```
 Catatan: memerlukan PyTorch terpasang (lihat requirements.txt). Jika modul A/B/C belum tersedia, collection akan gagal dengan ImportError - bukan kegagalan tes.
+
+### Status pengujian dan dokumentasi lengkap
+
+Status aktual yang benar-benar dijalankan pada `master @ 4dbe3a2` (2026-10-24; Python 3.10.6,
+pytest 9.1.1, torch 2.14.1+cpu, CPU-only):
+
+| Perintah | Output aktual | Status |
+|---|---|---|
+| `python -m pytest -q` | `154 passed, 15 skipped` | PASS |
+| `python -m pytest -q --run-integration` | `169 passed` | PASS |
+| `python -m pytest -q -m integration --run-integration` | `15 passed, 154 deselected` | PASS |
+
+- Rincian perintah, matriks kontrak→test→status (`TECH_SPEC.md` §3–§7), matriks acceptance
+  criteria Issues #2–#6, hasil integrasi, riwayat debugging, dan hasil eksperimen:
+  [`docs/D12_TESTING_REPORT.md`](docs/D12_TESTING_REPORT.md).
+- Riwayat eksekusi per subtask D2–D11: [`docs/TESTING.md`](docs/TESTING.md).
+- Log kegagalan dan bukti reproduksinya: [`docs/D9_FAILURE_LOG.md`](docs/D9_FAILURE_LOG.md);
+  verifikasi perbaikan: [`docs/D10_FIX_VERIFICATION.md`](docs/D10_FIX_VERIFICATION.md).
+- Laporan eksperimen training 4 epoch: [`docs/ai-logs/reports/AI-LOG-C14-experiment.md`](docs/ai-logs/reports/AI-LOG-C14-experiment.md).
+
+**Penting:** suite hijau tidak berarti seluruh jalur pemakaian di README ini terverifikasi.
+Temuan yang masih terbuka: restore checkpoint mengikuti §11 di bawah belum memulihkan tokenizer
+sehingga `generate()` mengembalikan string kosong tanpa error (F-D9-01); `generate` masih memakai
+`context_length=64` hardcode sehingga model dengan konteks lain dapat gagal (F-D9-02); signature
+`generate` berbeda dari `TECH_SPEC.md` §6 (F-D9-03); artefak `outputs/metrics/full/` tidak ada di
+repo sehingga contoh restore tidak dapat dijalankan langsung dari clone (F-D9-06). Rincian dan
+status tiap temuan ada di `docs/D12_TESTING_REPORT.md` §6.
