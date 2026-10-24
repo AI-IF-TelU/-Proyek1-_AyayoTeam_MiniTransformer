@@ -1,10 +1,13 @@
 import unittest
 
+import pytest
 import torch
 
 from src.model.attention import CausalMultiHeadAttention
 from src.model.decoder_block import DecoderBlock
 from src.model.positional_encoding import SinCosPositionalEncoding
+
+pytestmark = pytest.mark.integration
 
 B, T, D_MODEL = 2, 16, 64
 N_HEADS = 4

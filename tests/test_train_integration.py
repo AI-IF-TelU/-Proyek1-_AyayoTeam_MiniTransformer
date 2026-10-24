@@ -1,5 +1,6 @@
 """Integration smoke test using real Issue A data components (C11)."""
 
+import pytest
 import torch
 from torch.utils.data import DataLoader
 
@@ -7,6 +8,8 @@ from src.data.dataset import TextDataset, create_dataloader
 from src.data.tokenizer import Tokenizer
 from src.model.minigpt import MiniGPT
 from src.train import train
+
+pytestmark = pytest.mark.integration
 
 
 def test_integration_one_epoch():

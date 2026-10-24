@@ -53,6 +53,8 @@ Modul dari Issues A, B, dan C sudah tersedia, sehingga seluruh tes dikoleksi tan
 
 Catatan status (D8, terverifikasi): penanda `integration` terdaftar di `pytest.ini` dan mekanisme skip-nya ada di `tests/conftest.py`, tetapi **belum ada satu pun tes yang memakai `@pytest.mark.integration`**. Akibatnya `-q --run-integration` menjalankan 162 tes yang sama dengan `-q` biasa. Penandaan tes integrasi yang sesungguhnya belum diputuskan dan berada di luar scope D8 (kandidat: D11).
 
+Status terkini (**D11**, 2026-10-24): marker `integration` sudah dipakai oleh **15 tes** di tiga berkas (`test_end_to_end_pipeline.py` 7, `test_integration_components.py` 7, `test_train_integration.py` 1). `python -m pytest -q` menjalankan 154 tes dan melewati 15 tes integrasi; `python -m pytest -q --run-integration` menjalankan seluruh 169 tes.
+
 ## Hasil Verifikasi Aktual
 
 Perintah `python -m pytest -q` dijalankan dan terlihat output: `103 passed in 17.55s` (durasi dapat bervariasi antarrun; run verifikasi lain mencatat 18.35s). Semua tes kontrak lulus pada environment yang tersedia. Hasil ini mencakup tes tokenizer, positional encoding, causal attention, decoder block, MiniGPT logits, training step, checkpoint roundtrip, generation stop, sliding window, dan data pipeline.
@@ -429,6 +431,86 @@ D10 tidak menambahkan file tes ke `tests/`: persetujuan yang diberikan adalah *v
 attempt* tanpa memerahkan suite bersama, dan menambahkan tes yang mengunci perilaku buggy akan
 melegalkan bug. Dua tes regresi kandidat (dengan `<eos>` dinetralkan) sudah ditulis lengkap di
 `docs/D10_FIX_VERIFICATION.md` §12 untuk dipakai pada D11 setelah modul diperbaiki.
+
+### Subtask D11 — Tes integrasi lintas modul dalam satu run
+
+Eksekusi: 2026-10-24 21:15–21:45 WIB pada `master` @ `68ff3df` (tanpa operasi Git).
+Environment: Python 3.10.6, pytest 9.1.1, torch 2.14.1+cpu (`.venv`), CPU-only.
+Tidak ada perubahan `src/`, kontrak publik, `pytest.ini`, atau dependency.
+
+#### Cakupan integrasi
+
+Marker `integration` kini benar-benar dipakai. Tes integrasi menjalankan komponen **nyata** dari
+Issues A, B, dan C dalam satu alur, tanpa stub model/tokenizer untuk jalur utama:
+
+| Berkas | Tes | Alur yang diintegrasikan |
+|---|---:|---|
+| `tests/test_end_to_end_pipeline.py` (baru) | 7 | `Tokenizer.fit` → `TextDataset` → `create_dataloader` → `MiniGPT.forward` → `CrossEntropyLoss(ignore_index=0)` → `backward`/`optimizer.step` → `generate` |
+| `tests/test_integration_components.py` | 7 | `SinCosPositionalEncoding` → `CausalMultiHeadAttention` → `DecoderBlock` (gradient, tidak ada `nn.Transformer*`) |
+| `tests/test_train_integration.py` | 1 | `Tokenizer` + `TextDataset` + `create_dataloader` + `train` nyata, satu epoch kecil |
+| **Total** | **15** | |
+
+Perilaku yang dibuktikan (bukan sekadar "tidak error"):
+
+1. **Shape dan relasi shift.** Batch `x`/`y` `[4, 64]` int64; `x[i,t] == y[i,t-1]` pada posisi
+   non-pad; guard `T=65` → `ValueError`; logits `[4, 64, V]` float32 finite.
+2. **Padding diabaikan loss.** Batch dengan padding nyata; loss `CrossEntropyLoss(ignore_index=0)`
+   dibandingkan dengan rata-rata manual hanya pada posisi non-pad (selisih `1e-6`), dan jumlah
+   target pad dipastikan `> 0` agar tes tidak vakum.
+3. **Training step nyata.** Gradien `token_emb.weight` dan `lm_head.weight` non-None dan non-nol,
+   lalu `optimizer.step()` mengubah kedua parameter tersebut.
+4. **Aturan `max_new_tokens`.** Dengan tokenizer nyata dan `<eos>` dinetralkan (`eos_id=-1`),
+   jumlah id yang didekode tepat `len(prompt) + max_new_tokens` untuk `max_new_tokens` 0, 3, dan 8.
+5. **Aturan berhenti `<eos>`.** `lm_head` diarahkan agar argmax = `eos` (tanpa mengganti model);
+   tokenizer nyata dibungkus perekam sehingga terbukti tidak ada token yang ditambahkan setelah
+   `<eos>` (id yang didekode tepat sama dengan prompt tanpa `<bos>`).
+6. **Sliding window generasi.** Prompt lebih panjang dari `context_length=64` tetap menghasilkan
+   output tanpa `ValueError`.
+7. **Korpus nyata.** 60 dokumen `data/processed/train.jsonl`: jumlah window dataset **sama persis**
+   dengan penjumlahan per dokumen (`len(ids)-64` untuk dokumen ≥ 65 token, 1 untuk dokumen pendek),
+   sehingga window lintas dokumen akan membuat tes gagal; satu batch nyata → forward → loss →
+   `backward` dengan gradien `lm_head` non-nol.
+
+#### Hasil aktual
+
+| Perintah | Output aktual | Status |
+|---|---|---|
+| `python -m pytest --collect-only -q --run-integration` | `169 tests collected in 9.87s` | OK |
+| `python -m pytest -q` | `154 passed, 15 skipped in 26.13s` | PASS (skip = 15 tes integrasi) |
+| `python -m pytest -q --run-integration` | `169 passed in 23.80s` | PASS |
+| `python -m pytest -q -m integration --run-integration` | `15 passed, 154 deselected in 20.22s` | PASS |
+| `python -m pytest tests/test_end_to_end_pipeline.py -v --run-integration` | `7 passed in 16.91s` | PASS |
+
+Konsistensi jumlah: 154 + 15 = 169 = total koleksi. Tidak ada `failed`, `error`, atau `xfail`.
+
+#### Temuan baru (test-infrastructure, bukan kontrak modul)
+
+**F-D11-01 (rendah): `tests/helpers.py:make_batch` membangun relasi shift terbalik.**
+`helpers.make_batch` menetapkan `y[:, 1:] = x[:, :-1]`, yaitu `x[i,t] == y[i,t+1]`, sedangkan
+`TECH_SPEC.md` §4 dan dataset nyata memakai `x[i,t] == y[i,t-1]`. Bukti: batch nyata memenuhi
+`x[:,1:] == y[:,:-1]` (diverifikasi `test_tokenizer_dataset_model_shapes`), sementara
+`test_training_contract.py::_make_batch` memakai arah yang benar sehingga kontrak training tidak
+terpengaruh. Dampak saat ini **nol** karena fixture `batch` (satu-satunya pemakai
+`helpers.make_batch`) tidak dipakai tes mana pun. Tidak diubah pada D11 agar scope tetap pada
+eksekusi integrasi; perlu keputusan pemilik Issue D/koordinator.
+
+#### Temuan D9/D10 yang tetap terbuka
+
+D11 **tidak** menutup F-D9-01…F-D9-06. Jalur restore checkpoint → `generate` dan
+`generate` pada `model.context_length != 64` masih tidak dicakup, karena keduanya akan gagal
+sampai pemilik Issue C memperbaiki `src/data/tokenizer.py` dan `src/generate.py`. Tes regresi
+kandidat tetap disimpan di `docs/D10_FIX_VERIFICATION.md` §12 dan belum dimasukkan ke `tests/`.
+
+#### Keterbatasan
+
+1. CPU-only; tidak ada uji CUDA, mixed precision, atau multi-GPU.
+2. Tes korpus nyata memakai 60 dokumen pertama `data/processed/train.jsonl` (bukan 720 penuh) agar
+   durasi suite wajar; berkas wajib ada, jika hilang tes gagal eksplisit (`pytest.fail`).
+3. Tidak melatih model hingga konvergen; kualitas model tidak diuji, hanya kontrak alur.
+4. `max_new_tokens`/stop-`<eos>` diuji dengan arah `lm_head` yang diatur agar deterministik;
+   bobot hasil training nyata tidak dipakai untuk menguji aturan berhenti.
+5. `test_data_split.py` masih menulis ulang `data/processed/` dan tetap tanpa marker
+   `integration` (perilakunya sudah dicatat sebagai keterbatasan D8 nomor 3).
 
 ## Catatan Teknis
 

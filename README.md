@@ -309,6 +309,15 @@ Perintah menjalankan seluruh suite:
 ```
 python -m pytest -q
 ```
+Tes integrasi lintas modul (tokenizer → dataset → model → loss → generation) ditandai
+`@pytest.mark.integration` dan dilewati secara default. Jalankan bersama seluruh suite dengan:
+```
+python -m pytest -q --run-integration
+```
+Hanya tes integrasi:
+```
+python -m pytest -q -m integration --run-integration
+```
 Subset per modul:
 ```
 python -m pytest tests/test_tokenizer.py -q
