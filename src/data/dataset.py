@@ -64,3 +64,54 @@ class TextDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         x, y = self.samples[idx]
         return torch.tensor(x, dtype=torch.long), torch.tensor(y, dtype=torch.long)
+
+
+def iter_document_chunks(texts: Sequence[str], tokenizer: Tokenizer,
+                         context_length: int = 64):
+    """Yield (x, y, doc_index) over NON-overlapping windows of each document.
+
+    `TextDataset` slides with stride 1, which inflates a 80-document validation
+    split into 28k highly redundant rows. For measurement, each token must be
+    counted once: chunking keeps every token but yields one row per
+    `context_length` tokens, so per-document losses are independent samples.
+    """
+    chunk = context_length + 1
+    bos_id = tokenizer.special_tokens["<bos>"]
+    eos_id = tokenizer.special_tokens["<eos>"]
+
+    for doc_index, text in enumerate(texts):
+        full_ids = add_bos_eos(tokenizer.encode(text), bos_id=bos_id, eos_id=eos_id)
+        if len(full_ids) < 4:
+            continue
+        for start in range(0, len(full_ids) - 1, context_length):
+            window = full_ids[start:start + chunk]
+            if len(window) < 2:
+                break
+            yield window[:-1], window[1:], doc_index
+
+
+def chunked_document_batches(texts: Sequence[str], tokenizer: Tokenizer,
+                             context_length: int = 64, batch_size: int = 32,
+                             pad_id: int = 0):
+    """Batch `iter_document_chunks` output into padded (x, y, doc_ids) tensors."""
+    xs, ys, docs = [], [], []
+
+    def flush():
+        width = max(len(x) for x in xs)
+        bx = torch.full((len(xs), width), pad_id, dtype=torch.long)
+        by = torch.full((len(ys), width), pad_id, dtype=torch.long)
+        for row, (x, y) in enumerate(zip(xs, ys)):
+            bx[row, :len(x)] = torch.tensor(x, dtype=torch.long)
+            by[row, :len(y)] = torch.tensor(y, dtype=torch.long)
+        return bx, by, list(docs)
+
+    for x, y, doc in iter_document_chunks(texts, tokenizer, context_length):
+        xs.append(x)
+        ys.append(y)
+        docs.append(doc)
+        if len(xs) == batch_size:
+            yield flush()
+            xs, ys, docs = [], [], []
+    if xs:
+        yield flush()
+

@@ -86,6 +86,56 @@ def evaluate(model, data_loader, criterion) -> float:
     return total / max(n, 1)
 
 
+def evaluate_per_document(model, doc_batches, pad_id: int = 0, ignore_ids=()):
+    """Loss aggregated per document, so each held-out article counts once.
+
+    `doc_batches` yields `(x, y, doc_ids)` where `doc_ids[i]` names the document
+    row `i` came from. Sliding-window evaluation repeats one article ~54x; that
+    inflates the token count without adding evidence. Here chunk losses are
+    averaged per document first, then every document contributes one sample.
+
+    `ignore_ids` excludes target tokens from the average (e.g. `<unk>`), which
+    ADR-013 requires because an OOV token is impossible to predict: including it
+    mixes tokenizer coverage into a model-quality number. A document whose every
+    target token is ignored carries no evidence and is dropped, not counted as
+    zero loss.
+
+    Returns (mean_loss, stddev, n_documents).
+    """
+    model.eval()
+    ignored = tuple(int(i) for i in ignore_ids if int(i) != pad_id)
+    per_doc_sum = {}
+    per_doc_count = {}
+    with torch.no_grad():
+        for x, y, doc_ids in doc_batches:
+            x, y = x.to(_model_device(model)), y.to(_model_device(model))
+            logits = model(x)
+            flat_logits = logits.reshape(-1, logits.size(-1))
+            flat_target = y.reshape(-1)
+            tok_loss = torch.nn.functional.cross_entropy(
+                flat_logits, flat_target, ignore_index=pad_id, reduction="none"
+            )
+            keep = (flat_target != pad_id).reshape(y.shape)
+            for value in ignored:
+                keep &= y != value
+            row_sum = (tok_loss.reshape(y.shape) * keep).sum(dim=1)
+            row_count = keep.sum(dim=1)
+            for row, doc in enumerate(doc_ids):
+                doc = int(doc)
+                per_doc_sum[doc] = per_doc_sum.get(doc, 0.0) + float(row_sum[row])
+                per_doc_count[doc] = per_doc_count.get(doc, 0) + int(row_count[row])
+
+    losses = [per_doc_sum[d] / per_doc_count[d]
+              for d in sorted(per_doc_sum) if per_doc_count[d] > 0]
+    if not losses:
+        return float("nan"), float("nan"), 0
+    mean = sum(losses) / len(losses)
+    if len(losses) < 2:
+        return mean, 0.0, 1
+    var = sum((v - mean) ** 2 for v in losses) / (len(losses) - 1)
+    return mean, var ** 0.5, len(losses)
+
+
 def train(
     model,
     train_loader,
