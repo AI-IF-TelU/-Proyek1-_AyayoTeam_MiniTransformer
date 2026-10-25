@@ -224,3 +224,49 @@ class TestMiniGPTInitValidation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_tie_embeddings_defaults_to_false_and_keeps_separate_head():
+    from src.model.minigpt import MiniGPT
+    model = MiniGPT(vocab_size=32, n_layers=1, n_heads=2, d_model=8, context_length=8)
+    assert model.tie_embeddings is False
+    assert model.lm_head.weight is not model.token_emb.weight
+
+
+def test_tie_embeddings_shares_one_matrix():
+    from src.model.minigpt import MiniGPT
+    model = MiniGPT(vocab_size=32, n_layers=1, n_heads=2, d_model=8, context_length=8,
+                    tie_embeddings=True)
+    assert model.lm_head.weight is model.token_emb.weight
+
+
+def test_tie_embeddings_saves_exactly_vocab_times_d_model_parameters():
+    from src.model.minigpt import MiniGPT
+    kwargs = dict(vocab_size=50, n_layers=2, n_heads=2, d_model=8, context_length=8)
+    untied = MiniGPT(**kwargs, tie_embeddings=False)
+    tied = MiniGPT(**kwargs, tie_embeddings=True)
+    saved = sum(p.numel() for p in untied.parameters()) - sum(p.numel() for p in tied.parameters())
+    assert saved == 50 * 8
+
+
+def test_tied_model_forward_shape_and_gradients():
+    import torch
+    from src.model.minigpt import MiniGPT
+    model = MiniGPT(vocab_size=20, n_layers=1, n_heads=2, d_model=8,
+                    context_length=8, dropout=0.0, tie_embeddings=True)
+    idx = torch.randint(1, 20, (2, 8))
+    logits = model(idx)
+    assert tuple(logits.shape) == (2, 8, 20)
+    logits.sum().backward()
+    assert model.token_emb.weight.grad is not None
+    assert float(model.token_emb.weight.grad.abs().sum()) > 0
+
+
+def test_tied_and_untied_are_different_models():
+    import torch
+    from src.model.minigpt import MiniGPT
+    torch.manual_seed(0)
+    kwargs = dict(vocab_size=20, n_layers=1, n_heads=2, d_model=8, context_length=8)
+    tied = MiniGPT(**kwargs, tie_embeddings=True)
+    assert sum(p.numel() for p in tied.parameters()) < \
+        sum(p.numel() for p in MiniGPT(**kwargs, tie_embeddings=False).parameters())

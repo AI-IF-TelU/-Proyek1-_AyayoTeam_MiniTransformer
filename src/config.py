@@ -20,6 +20,8 @@ class ModelConfig:
     d_ff: int = 256
     dropout: float = 0.1
     layer_norm_eps: float = 1e-5
+    tie_embeddings: bool = False
+    min_freq: int = 1
 
 
 @dataclass

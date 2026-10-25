@@ -14,27 +14,40 @@ class Tokenizer:
         self.token_to_id: Dict[str, int] = {}
         self.id_to_token: Dict[int, str] = {}
         self._vocab_size = 0
+        self.min_freq: int = 1
 
-    def fit(self, texts: Sequence[str]) -> None:
-        """Bangun vocab dari train set."""
+    def fit(self, texts: Sequence[str], min_freq: int = 1) -> None:
+        """Bangun vocab dari train set.
+
+        `min_freq` membuang token yang muncul kurang dari N kali (ADR-013).
+        Default 1 = tanpa batas, yaitu perilaku baseline TECH_SPEC §3.
+        """
+        if min_freq < 1:
+            raise ValueError(f"min_freq must be >= 1, got {min_freq}")
+
         counts = Counter()
         for text in texts:
             tokens = re.findall(r"\w+|[^\w\s]", text.lower())
             counts.update(tokens)
 
         # Urutkan frekuensi (tie-breaker: alfabetis)
-        sorted_tokens = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
-        
+        sorted_tokens = sorted(
+            ((tok, n) for tok, n in counts.items() if n >= min_freq),
+            key=lambda x: (-x[1], x[0]),
+        )
+
         self.token_to_id = self.special_tokens.copy()
         self.id_to_token = {v: k for k, v in self.special_tokens.items()}
-        
+
         for token, _ in sorted_tokens:
             if token not in self.token_to_id:
                 token_id = len(self.token_to_id)
                 self.token_to_id[token] = token_id
                 self.id_to_token[token_id] = token
-        
+
         self._vocab_size = len(self.token_to_id)
+        self.min_freq = min_freq
+
 
     @classmethod
     def from_vocab(cls, vocab: Dict[str, int]) -> "Tokenizer":

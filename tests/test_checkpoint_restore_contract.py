@@ -42,8 +42,7 @@ def _config(vocab_size: int) -> dict:
 
 def _restore(path: str):
     ck = load_checkpoint(path)
-    model_cfg = {k: v for k, v in ck["config"]["model"].items() if k != "d_ff"}
-    model = MiniGPT(**model_cfg)
+    model = MiniGPT.from_config(ck["config"]["model"])
     model.load_state_dict(ck["state_dict"])
     tokenizer = Tokenizer.from_vocab(ck["vocab"])
     return model, tokenizer, ck
@@ -81,3 +80,42 @@ def test_restored_vocab_size_builds_minigpt():
     rebuilt = MiniGPT(vocab_size=restored_tok.vocab_size, n_layers=1, n_heads=2,
                       d_model=8, context_length=64, dropout=0.0)
     assert rebuilt.lm_head.out_features == tok.vocab_size
+
+
+def _c15_config(vocab_size: int) -> dict:
+    """Config seperti yang ditulis notebook C15: ada min_freq dan tie_embeddings."""
+    cfg = _config(vocab_size)["model"]
+    cfg.update({"min_freq": 2, "tie_embeddings": True})
+    return {"model": cfg}
+
+
+def test_restore_c15_checkpoint_with_extra_config_keys():
+    """Config C15 memuat `min_freq`, yang bukan parameter konstruktor MiniGPT."""
+    tok = _fit_tokenizer()
+    model = MiniGPT(vocab_size=tok.vocab_size, n_layers=1, n_heads=2, d_model=8,
+                    context_length=64, dropout=0.0, tie_embeddings=True)
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "ckpt_c15.pt")
+        save_checkpoint(path, model, vocab=tok.token_to_id, config=_c15_config(tok.vocab_size))
+        restored, restored_tok, ck = _restore(path)
+
+    assert restored.tie_embeddings is True
+    assert restored.lm_head.weight is restored.token_emb.weight
+    assert restored_tok.vocab_size == len(ck["vocab"])
+    assert generate(restored, restored_tok, "presiden", max_new_tokens=1, eos_id=-1)
+
+
+def test_from_config_ignores_unknown_keys():
+    model = MiniGPT.from_config({
+        "vocab_size": 12, "n_layers": 1, "n_heads": 2, "d_model": 8,
+        "context_length": 8, "d_ff": 32, "min_freq": 2,
+        "something_not_a_parameter": 99,
+    })
+    assert model.context_length == 8
+
+
+def test_from_config_requires_vocab_size():
+    import pytest
+    with pytest.raises(TypeError):
+        MiniGPT.from_config({"n_layers": 1})
+

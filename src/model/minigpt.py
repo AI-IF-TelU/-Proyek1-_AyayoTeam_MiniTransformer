@@ -20,6 +20,7 @@ class MiniGPT(nn.Module):
         context_length: int = 64,
         dropout: float = 0.1,
         layer_norm_eps: float = 1e-5,
+        tie_embeddings: bool = False,
     ) -> None:
         super().__init__()
         if vocab_size <= 0:
@@ -44,6 +45,7 @@ class MiniGPT(nn.Module):
         self.context_length = context_length
         self.dropout = dropout
         self.layer_norm_eps = layer_norm_eps
+        self.tie_embeddings = bool(tie_embeddings)
         self.d_ff = 4 * d_model
 
         self.token_emb = nn.Embedding(vocab_size, d_model)
@@ -62,6 +64,23 @@ class MiniGPT(nn.Module):
         )
         self.ln_f = nn.LayerNorm(d_model, eps=layer_norm_eps)
         self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
+        if self.tie_embeddings:
+            # ADR-014: LM head memakai matriks embedding yang sama (transpose).
+            self.lm_head.weight = self.token_emb.weight
+
+    @classmethod
+    def from_config(cls, config: dict) -> "MiniGPT":
+        """Bangun model dari dict config apa adanya.
+
+        `src/config.py::ModelConfig` menyimpan `d_ff` dan `min_freq`, yang bukan
+        parameter konstruktor `MiniGPT` (d_ff = 4 * d_model; min_freq milik
+        tokenizer). Tanpa penyaringan ini, memuat checkpoint C15 gagal dengan
+        `TypeError: unexpected keyword argument 'min_freq'`.
+        """
+        import inspect
+
+        allowed = set(inspect.signature(cls.__init__).parameters) - {"self"}
+        return cls(**{k: v for k, v in config.items() if k in allowed})
 
     def forward(self, idx: torch.Tensor) -> torch.Tensor:
         if not torch.is_tensor(idx):
@@ -83,5 +102,8 @@ class MiniGPT(nn.Module):
         for block in self.blocks:
             x = block(x)  # [B, T, d_model]
         x = self.ln_f(x)  # [B, T, d_model]
-        logits = self.lm_head(x)  # [B, T, vocab_size]
+        if self.tie_embeddings:
+            logits = x @ self.token_emb.weight.t()  # [B, T, vocab_size]
+        else:
+            logits = self.lm_head(x)  # [B, T, vocab_size]
         return logits.to(torch.float32)

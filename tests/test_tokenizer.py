@@ -106,3 +106,37 @@ class TestTokenizerOrder(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_min_freq_default_keeps_every_token():
+    from src.data.tokenizer import Tokenizer
+    tok = Tokenizer()
+    tok.fit(["halo dunia sekali", "halo dunia"])
+    assert tok.vocab_size == 4 + 3, "default min_freq=1 keeps hapax"
+    assert tok.min_freq == 1
+
+
+def test_min_freq_two_drops_hapax_and_maps_them_to_unk():
+    from src.data.tokenizer import Tokenizer
+    tok = Tokenizer()
+    tok.fit(["halo dunia sekali", "halo dunia"], min_freq=2)
+    assert "sekali" not in tok.token_to_id
+    assert tok.vocab_size == 4 + 2
+    assert tok.encode("halo sekali")[1] == tok.special_tokens["<unk>"]
+
+
+def test_min_freq_rejects_values_below_one():
+    from src.data.tokenizer import Tokenizer
+    import pytest
+    with pytest.raises(ValueError):
+        Tokenizer().fit(["a b"], min_freq=0)
+
+
+def test_min_freq_does_not_change_ids_of_kept_tokens():
+    from src.data.tokenizer import Tokenizer
+    full, pruned = Tokenizer(), Tokenizer()
+    corpus = ["a b c d", "a b c", "a b"]
+    full.fit(corpus, min_freq=1)
+    pruned.fit(corpus, min_freq=2)
+    for token, idx in pruned.token_to_id.items():
+        assert full.token_to_id[token] == idx, "pruning must not renumber kept tokens"
