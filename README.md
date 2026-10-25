@@ -18,7 +18,18 @@ Implementasi model bahasa generatif kecil menggunakan arsitektur **Decoder-only 
 - Git dan GitHub.
 - Dataset: [Indonesian News Datasets](https://huggingface.co/datasets/fahadh4ilyas/indonesian_news_datasets).
 
-Dataset awal menggunakan subset 1.000 artikel (keputusan koordinator 19 Okt 2026; ADR-012). Pemrosesan, split berdasarkan dokumen, tokenizer, dan pembentukan data training mengikuti [`docs/DATASET_CARD.md`](docs/DATASET_CARD.md).
+Dataset awal menggunakan subset 1.000 artikel (keputusan koordinator 19 Okt 2026; ADR-012); eksperimen C15 memakai subset 1.800 artikel (1.440 train / 159 val / 200 test) sesuai ADR-015. Pemrosesan, split berdasarkan dokumen, tokenizer, dan pembentukan data training mengikuti [`docs/DATASET_CARD.md`](docs/DATASET_CARD.md).
+
+Perbedaan konfigurasi antara baseline dan C15 dicatat di ADR-013 (batas `min_freq` vocabulary), ADR-014 (weight tying dan `n_layers`), ADR-015 (`context_length` 128 dan subset 1.800 artikel), dan ADR-016 (20 epoch). Ringkasnya:
+
+| Aspek | Baseline (TECH_SPEC) | C15 | ADR |
+|---|---|---|---|
+| Subset | 1.000 artikel | 1.800 artikel (1.440/159/200) | ADR-015 |
+| `context_length` | 64 | 128 | ADR-015 |
+| `min_freq` vocab | 1 (19.192 tipe) | 2 (16.278 tipe) | ADR-013 |
+| Weight tying | tidak | ya | ADR-014 |
+| `n_layers` | 2 | 4 | ADR-014 |
+| `epochs` | 10 | 20 | ADR-016 |
 
 ## 3. Instalasi dari Awal
 
@@ -285,9 +296,10 @@ from src.generate import generate
 # `python run_training.py --metrics-dir outputs/metrics` menulis ke outputs/metrics/.
 ck = load_checkpoint("outputs/metrics/minigpt_c14.pt")
 
-# d_ff tersimpan di config tetapi diturunkan otomatis oleh MiniGPT (4 * d_model)
-model_cfg = {k: v for k, v in ck["config"]["model"].items() if k != "d_ff"}
-model = MiniGPT(**model_cfg)
+# `config["model"]` memuat kunci yang bukan parameter konstruktor MiniGPT
+# (`d_ff` diturunkan otomatis, `min_freq` milik tokenizer). Pakai from_config
+# agar checkpoint C14 maupun C15 bisa dimuat tanpa menyaring manual.
+model = MiniGPT.from_config(ck["config"]["model"])
 model.load_state_dict(ck["state_dict"])
 
 # Restore resmi: mengisi token_to_id, id_to_token, dan vocab_size sekaligus.
@@ -302,7 +314,7 @@ Tanpa `Tokenizer.from_vocab`, `id_to_token` dan `vocab_size` tetap kosong sehing
 
 Generation menggunakan **greedy decoding**: berhenti saat `<eos>` dihasilkan atau saat `max_new_tokens` tercapai, dengan konteks dibatasi `context_length` terakhir (window geser).
 
-### Hasil eksperimen 4 epoch (Modal CPU)
+### Hasil eksperimen 4 epoch (Modal CPU, baseline C14)
 
 Detail lengkap (metadata, tabel loss, contoh generate, dan analisis overfitting) ada di [`docs/ai-logs/reports/AI-LOG-C14-experiment.md`](docs/ai-logs/reports/AI-LOG-C14-experiment.md).
 
@@ -313,7 +325,41 @@ Detail lengkap (metadata, tabel loss, contoh generate, dan analisis overfitting)
 | 3 | 3.640476 | 8.304918 |
 | 4 | 3.335589 | 8.649888 |
 
-Train loss turun sementara val loss naik konsisten — **indikasi overfitting**, bukan bukti model berkualitas baik.
+Train loss turun sementara val loss naik konsisten — **indikasi overfitting**, bukan bukti model berkualitas baik. Angka ini adalah baseline yang memicu eksperimen C15 (lihat ADR-013 s.d. ADR-016).
+
+### Eksperimen C15 (Kaggle) — satu-satunya notebook yang dipakai
+
+`kaggle_c15.ipynb` adalah notebook eksperimen aktif; `kaggle_c14.ipynb` sudah dihapus agar tidak ada dua sumber yang berbeda. Dataset untuk Kaggle dibangun dengan `python make_kaggle_zip.py`, yang juga memverifikasi jumlah dokumen per split terhadap ADR-015 (1.440/159/200) dan gagal bila tidak cocok.
+
+Artefak run **semuanya JSONL** di `/kaggle/working/outputs/metrics/` (ADR-011):
+
+| File | Isi |
+|---|---|
+| `c15_kaggle_metrics.jsonl` | 20 record `epoch` + `final_eval` + `generation` |
+| `c15_kaggle_generations.jsonl` | `meta`, `calibration`, `sampling_grid`, dan `sample` per prompt |
+| `c15_kaggle_config.jsonl` | satu baris `meta` + satu baris `config` |
+| `c15_kaggle_vocab.jsonl` | satu baris `{"token","id"}` per token |
+| `minigpt_c15_kaggle_best.pt` | checkpoint `val_loss` per dokumen terendah |
+| `minigpt_c15_kaggle_last.pt` | checkpoint epoch terakhir |
+
+Protokol pengukuran C15 (menggantikan pelaporan loss per window stride-1):
+
+- `val_loss` / `test_loss` dihitung **per dokumen** dengan window non-overlap + CI 95%. Window stride-1 menghitung token yang sama puluhan kali sehingga loss terlihat jauh lebih pasti daripada buktinya.
+- Target `<unk>` dikecualikan dari rata-rata loss (ADR-013), karena token di luar vocabulary mustahil diprediksi. Notebook melaporkan kedua angka: dengan dan tanpa `<unk>`.
+- Epoch yang selisihnya di bawah CI dicatat sebagai `tied_epochs`; checkpoint "best" di antara mereka tidak boleh diklaim sebagai optimum.
+- Kualitas generasi diukur dengan `dup_4gram` (bukan trigram, yang dilarang decoder), `ends_at_sentence_pre_trim` (diukur sebelum pemotongan), dan `verbatim_span_tokens` (indikator hafalan).
+
+### Cara membaca artefak C15 saat laporan
+
+Tiga angka generasi mudah disalahartikan. Baca begini:
+
+| Metrik | Arti | Jebakan |
+|---|---|---|
+| `dup_4gram` | 4-gram berulang per output | `dup_trigram` selalu 0 karena `no_repeat_ngram_size=3` melarangnya; nol di sana bukan bukti model membaik |
+| `ends_at_sentence_pre_trim` | output mentah berakhir `.`/`!`/`?` sebelum dipotong | kalau diukur sesudah trim, hasilnya selalu 100% karena trim sendiri yang memotong |
+| `verbatim_span_tokens` | span terpanjang identik dengan train | naik = makin menghafal; pada C14 rata-rata 6,3 token (maks 12) |
+
+Selain itu, `val_loss` C15 **tidak** bisa dibandingkan langsung dengan C14 karena vocabulary berbeda (16.278 vs 19.192) dan `<unk>` lebih sering muncul. Bandingkan `test_loss` setelah mengecualikan `<unk>`, atau bandingkan output secara kualitatif.
 
 ## 12. Testing (pytest)
 
@@ -359,12 +405,19 @@ pytest 9.1.1, torch 2.14.1+cpu, CPU-only):
 - Riwayat eksekusi per subtask D2–D13: [`docs/TESTING.md`](docs/TESTING.md).
 - Log kegagalan dan bukti reproduksinya: [`docs/D9_FAILURE_LOG.md`](docs/D9_FAILURE_LOG.md);
   verifikasi perbaikan: [`docs/D10_FIX_VERIFICATION.md`](docs/D10_FIX_VERIFICATION.md).
-- Laporan eksperimen training 4 epoch: [`docs/ai-logs/reports/AI-LOG-C14-experiment.md`](docs/ai-logs/reports/AI-LOG-C14-experiment.md).
+- Laporan eksperimen training 4 epoch (baseline C14): [`docs/ai-logs/reports/AI-LOG-C14-experiment.md`](docs/ai-logs/reports/AI-LOG-C14-experiment.md).
+- Notepad eksperimen aktif: [`kaggle_c15.ipynb`](kaggle_c15.ipynb); keputusan yang mengubah baseline: ADR-013 s.d. ADR-016 di [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md).
 
 **Penting:** suite hijau tidak berarti seluruh jalur pemakaian di README ini terverifikasi.
 Temuan yang masih terbuka: restore checkpoint mengikuti §11 di bawah belum memulihkan tokenizer
 sehingga `generate()` mengembalikan string kosong tanpa error (F-D9-01); `generate` masih memakai
-`context_length=64` hardcode sehingga model dengan konteks lain dapat gagal (F-D9-02); signature
-`generate` berbeda dari `TECH_SPEC.md` §6 (F-D9-03); artefak `outputs/metrics/full/` tidak ada di
-repo sehingga contoh restore tidak dapat dijalankan langsung dari clone (F-D9-06). Rincian dan
-status tiap temuan ada di `docs/D12_TESTING_REPORT.md` §6.
+`context_length=64` hardcode sehingga model dengan konteks lain dapat gagal (F-D9-02, sudah
+diperbaiki: default mengikuti `model.context_length`); signature
+`generate` berbeda dari `TECH_SPEC.md` §6 (F-D9-03, sudah diselaraskan di dokumen §6 —
+signature aktual 7 parameter kini tercatat); artefak `outputs/metrics/full/` tidak ada di
+repo sehingga contoh restore tidak dapat dijalankan langsung dari clone (F-D9-06, masih
+terbuka). Rincian dan status tiap temuan ada di `docs/D12_TESTING_REPORT.md` §6.
+
+Catatan tambahan untuk restore: gunakan `MiniGPT.from_config(ck["config"]["model"])`,
+bukan `MiniGPT(**config)`. Config C15 memuat `min_freq`, yang bukan parameter konstruktor
+MiniGPT, sehingga penyaringan manual `if k != "d_ff"` tidak lagi cukup.
