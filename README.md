@@ -1,4 +1,4 @@
-# Mini-Transformer — Mini-GPT Bahasa Indonesia
+# Mini-Transformer — Mini-GPT Bahasa Indonesia (Indonesian News Dataset)
 
 Implementasi model bahasa generatif kecil menggunakan arsitektur **Decoder-only Transformer** dengan Python dan PyTorch. Model dilatih dari nol untuk memprediksi token berikutnya berdasarkan korpus berita bahasa Indonesia.
 
@@ -147,7 +147,6 @@ Seluruh interaksi (prompt, respons, dan aktivitas coding) yang dilakukan setiap 
 | Firdaus Akbar Amrullah | [#3](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/3) | MiniGPT, Training & Generation |
 | Muhammad Raihan Fahrifi | [#4](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/4) | Komponen Inti Transformer |
 | Rafa Suryaputra | [#5](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/5) | Unit Test, Integrasi & Dokumentasi |
-| Rafa + seluruh anggota | [#6](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/6) | Validasi Logging Otomatis |
 | Seluruh tim | [#7](https://github.com/AI-IF-TelU/AyayoTeam_MiniTransformer/issues/7) | Tracking pekerjaan |
 
 Issue #1 untuk spesifikasi teknis telah ditutup. Seluruh implementasi harus mengikuti `AGENTS.md`, `docs/TECH_SPEC.md`, dan acceptance criteria Issue terkait.
@@ -373,15 +372,25 @@ Artefak run **semuanya JSONL** di `/kaggle/working/outputs/metrics/` (ADR-011):
 Hasil run C15 yang sudah dijalankan disalin ke [`outputs/metrics/c15/`](outputs/metrics/c15/).
 Hasil baseline C14 ada di `outputs/metrics/full/`.
 
-Generate dari checkpoint mana pun:
+### Menjalankan Text Generation Interaktif (`tools/generate_text.py`)
 
+Gunakan skrip `tools/generate_text.py` untuk menguji inferensi model secara interaktif melalui terminal.
+
+**Cara menjalankan:**
 ```powershell
 python tools/generate_text.py
 ```
+Saat terminal menampilkan prompt `Prompt: `, masukkan teks awal (contoh: `presiden jokowi menegaskan`) lalu tekan `Enter`.
 
-Skrip itu memuat `outputs/metrics/c15/minigpt_c15_kaggle_best.pt`, memakai temperature hasil
-kalibrasi run (1.1), dan merapikan teks lewat `postprocess`. Ubah `CKPT` di bagian atas file
-untuk memakai checkpoint C14.
+**Alur kerja skrip:**
+1. **Memuat checkpoint:** Secara default memuat `outputs/metrics/c15/minigpt_c15_kaggle_best.pt` menggunakan `MiniGPT.from_config(ck["config"]["model"])` dan `tok = Tokenizer.from_vocab(ck["vocab"])`. (Ubah variabel `CKPT` di baris 13 jika ingin menguji checkpoint lain).
+2. **Case restoration map:** Membaca data `data/processed/train.jsonl` untuk membentuk kamus kapitalisasi nama diri (`build_case_map(train, min_count=3)`).
+3. **Konfigurasi decoding (`DecodeConfig`):** Menggunakan sampling dengan kalibrasi C15:
+   - `do_sample=True`, `temperature=1.1`, `top_p=0.9` (nucleus sampling)
+   - `repetition_penalty=1.1`, `no_repeat_ngram_size=3` (mencegah perulangan frasa)
+   - `ban_unk=True` (mengecualikan token `<unk>` dari prediksi)
+   - `seed=1234`
+4. **Post-processing:** Hasil token ID dibersihkan melalui `postprocess(...)` yang memulihkan spasi tanda baca, kapitalisasi kalimat/nama diri, dan pemotongan kalimat yang terpotong (`trim=True`).
 
 Protokol pengukuran C15 (menggantikan pelaporan loss per window stride-1):
 
@@ -438,10 +447,10 @@ pytest 9.1.1, torch 2.14.1+cpu, CPU-only):
 | `python -m pytest -q -m integration --run-integration` | `15 passed, 154 deselected` | PASS |
 
 - Rincian perintah, matriks kontrak→test→status (`TECH_SPEC.md` §3–§7), matriks acceptance
-  criteria Issues #2–#6, hasil integrasi, riwayat debugging, dan hasil eksperimen:
+  criteria Issues #2–#5, hasil integrasi, riwayat debugging, dan hasil eksperimen:
   [`docs/reports/D12_TESTING_REPORT.md`](docs/reports/D12_TESTING_REPORT.md).
-- **Laporan akhir berbasis bukti** (rekap acceptance criteria Issues #2–#6, ledger D1–D13, status
-  temuan terbuka, audit logging Issue E) pada `master @ edbf5cc`:
+- **Laporan akhir berbasis bukti** (rekap acceptance criteria Issues #2–#5, ledger D1–D13, status
+  temuan terbuka, audit logging) pada `master @ edbf5cc`:
   [`docs/reports/D13_FINAL_REPORT.md`](docs/reports/D13_FINAL_REPORT.md).
 - Riwayat eksekusi per subtask D2–D13: [`docs/reports/TESTING.md`](docs/reports/TESTING.md).
 - Log kegagalan dan bukti reproduksinya: [`docs/reports/D9_FAILURE_LOG.md`](docs/reports/D9_FAILURE_LOG.md);
@@ -462,3 +471,12 @@ terbuka). Rincian dan status tiap temuan ada di `docs/reports/D12_TESTING_REPORT
 Catatan tambahan untuk restore: gunakan `MiniGPT.from_config(ck["config"]["model"])`,
 bukan `MiniGPT(**config)`. Config C15 memuat `min_freq`, yang bukan parameter konstruktor
 MiniGPT, sehingga penyaringan manual `if k != "d_ff"` tidak lagi cukup.
+
+## 13. Credits
+
+Proyek ini dikembangkan oleh Tim Ayayo:
+
+- Rafa Suryaputra - NIM 103012580048
+- Firdaus Akbar Amrullah - NIM 103012580011
+- Dzaki Alwan Firjatullah - NIM 103012580006
+- Muhammad Raihan Fahrifi - NIM 103012580017

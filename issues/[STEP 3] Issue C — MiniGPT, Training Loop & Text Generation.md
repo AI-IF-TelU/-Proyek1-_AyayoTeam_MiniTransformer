@@ -34,7 +34,7 @@ Merakit MiniGPT (decoder-only) dari komponen inti, membangun training loop (Cros
 - Integrasi final logits dari komponen inti (Issue B) menunggu Issue B lulus tes.
 - Konsumen tokenizer/loader dari Issue A untuk menjalankan training sungguhan.
 - Kerangka + training interface boleh dibangun dan diuji dengan mock lebih awal (paralel dengan A/B).
-- Hasil teste digunakan Issue D dan berkontribusi ke Issue E.
+- Hasil teste digunakan Issue D.
 
 ## 6. Interface dan kontrak (dari TECH_SPEC)
 
@@ -102,7 +102,6 @@ Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Kerangka dan mock
 ## 12. Aturan logging AI
 
 - Ikuti `docs/AI_RULES.md` §6, `docs/AI_LOG_TEMPLATE.md`, dan ADR-006.
-- Smoke test logging personal (Issue E) WAJIB lolos sebelum coding dimulai.
 - Raw log di `docs/ai-logs/raw/<member-id>/`, laporan di `docs/ai-logs/reports/`; dilarang menulis API key, token, password, atau data sensitif.
 
 ## 13. Dokumentasi yang harus diperbarui

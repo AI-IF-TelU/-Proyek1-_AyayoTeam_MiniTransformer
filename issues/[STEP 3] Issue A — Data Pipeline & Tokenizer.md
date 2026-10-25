@@ -28,7 +28,7 @@ Membangun pipeline data end-to-end: mengakses Indonesian News Datasets, memilih 
 
 ## 4. Di luar scope
 
-- Implementasi komponen inti model (Issue B), MiniGPT/training/generation (Issue C), integrasi tes (Issue D), validasi logging (Issue E).
+- Implementasi komponen inti model (Issue B), MiniGPT/training/generation (Issue C), integrasi tes (Issue D).
 - Me-resplit test split bawaan yang terverifikasi.
 - Fit vocab dari validation/test.
 - Menambah dependency baru tanpa persetujuan koordinator.
@@ -128,7 +128,6 @@ Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Jangan melompat a
 ## 12. Aturan logging AI
 
 - Ikuti `docs/AI_RULES.md` §6, `docs/AI_LOG_TEMPLATE.md`, dan ADR-006.
-- Smoke test logging personal (Issue E) WAJIB lolos sebelum coding dimulai.
 - Raw log di `docs/ai-logs/raw/<member-id>/`, laporan Markdown di `docs/ai-logs/reports/`; dilarang menulis API key, token, password, atau data sensitif.
 
 ## 13. Dokumentasi yang harus diperbarui

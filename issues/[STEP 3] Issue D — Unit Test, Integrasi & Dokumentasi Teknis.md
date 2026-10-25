@@ -95,7 +95,6 @@ Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Setiap pemilik mo
 ## 12. Aturan logging AI
 
 - Ikuti `docs/AI_RULES.md` §6, `docs/AI_LOG_TEMPLATE.md`, dan ADR-006.
-- Smoke test logging personal (Issue E) WAJIB lolos sebelum coding dimulai.
 - Raw log di `docs/ai-logs/raw/<member-id>/`, laporan di `docs/ai-logs/reports/`; dilarang menulis API key, token, password, atau data sensitif.
 
 ## 13. Dokumentasi yang harus diperbarui
