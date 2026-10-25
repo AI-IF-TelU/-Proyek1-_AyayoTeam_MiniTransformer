@@ -97,7 +97,7 @@ Per subtask acceptance criteria verifiable, setiap anggota bertanggung jawab ata
 - **Framework testing:** **`pytest`** ditetapkan koordinator (2026-10-19) sebagai runner resmi. Issue D D2 menggunakannya tanpa izin tambahan.
 - **Struktur file final (keputusan koordinator 2026-10-19, Opsi 1):** tetap persis per kontrak TECH_SPEC §6 — `src/data/tokenizer.py`, `src/data/dataset.py`, `src/model/{positional_encoding,attention,decoder_block,minigpt}.py`, `src/train.py`, `src/generate.py`, opsional `src/config.py`. Tidak ada `src/data/preprocessing.py`, `scripts/prepare_data.py`, `src/training/`, `src/generation/`, `configs/`. Kalimat "dikonfirmasi saat integrasi" pada Issue A §2 dan Issue B §2 telah diubah menjadi "dikonfirmasi koordinator 2026-10-19".
 - **Format metrik output:** **JSONL** (keputusan koordinator 2026-10-19; ADR-011) — menggantikan pilihan ganda CSV/JSONL pada TECH_SPEC §6 dan Issue C.
-- **Jumlah subset dataset & strategi split (keputusan koordinator 2026-10-19):** subset = **1.000 artikel**; split bawaan train/test (25.8k/6.46k) dipertahankan tanpa resplit; validation diambil 10% dari split train (seed 42); fallback 80/10/10 **tidak dipakai** (ADR-012).
+- **Jumlah subset dataset & strategi split (keputusan koordinator 2026-10-19):** subset = **1.000 artikel**; split bawaan train/test (25.8k/6.46k) dipertahankan tanpa resplit; validation diambil 10% dari split train (seed 42); fallback 80/10/10 **tidak dipakai** (ADR-012). *Diamendemen untuk C15:* subset **1.800 artikel** (ADR-015); strategi split tetap sama.
 - **Kerja di `master` langsung (master-only):** seluruh anggota bekerja pada satu branch `master`. Dilarang membuat branch baru, pull request, atau merge. `git pull --ff-only origin master` hanya dijalankan saat anggota lain mengabarkan telah push (pengerjaan berurutan, saling menunggu).
 - **ADR-006 pembaruan tingkat verifikasi:** menunggu seluruh smoke test anggota selesai dan disetujui tim.
 
@@ -163,6 +163,12 @@ Verifikasi Issue E (E4–E10) oleh Rafa ditargetkan selesai Sel 20 Okt 2026 (12.
 - Sel 27 Okt (7 jam): C3, C4, C5, C6, C7, C8 — kerangka MiniGPT, alur mock, integrasi komponen Issue B, tes shape logits, loss + satu training step, tes parameter-update.
 - Rab 28 Okt (7 jam): C9, C10, C11, C12, C13, C14 — training loop + validation loss, metrik + checkpoint, loader asli Issue A, greedy generation, tes aturan stop, eksperimen + laporan.
 - **Fase paling rapat** (14 subtask / 2,5 hari, dependensi A dan B). Eksperimen C14 boleh memakai sebagian epoch dan dilaporkan jujur sebagai hasil aktual; klaim penuh 10 epoch hanya jika benar-benar dijalankan.
+
+### Amendemen C15 (2026-10-24)
+
+Eksperimen lanjutan C15 dijalankan setelah C14 selesai, dengan perubahan kontrak yang tercatat di ADR: `min_freq=2` (ADR-013), weight tying + `n_layers=4` (ADR-014), `context_length=128` + subset 1.800 artikel (ADR-015), dan 20 epoch (ADR-016). Satu-satunya notebook eksperimen adalah `kaggle_c15.ipynb`; `kaggle_c14.ipynb` dihapus agar tidak ada dua sumber berbeda. Seluruh artefak run berformat JSONL (ADR-011).
+
+Catatan metodologis: C15 mengubah tying, `min_freq`, `context_length`, dan jumlah epoch dalam satu run, sehingga kontribusi masing-masing tidak dapat dipisahkan. Atribusi per-variabel memerlukan ablation terpisah dan harus disebut sebagai keterbatasan bila angka C15 dilaporkan.
 
 ### Fase 4 — Issue D (Rafa Suryaputra) — 13 subtask
 - **Mulai:** Kam 29 Okt 2026 (09.00) · **Deadline:** Jum 30 Okt 2026 (17.00) · **Estimasi:** ~16 jam · **Buffer:** 1–2 jam.

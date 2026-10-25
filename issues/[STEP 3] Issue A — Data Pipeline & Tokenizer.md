@@ -136,3 +136,15 @@ Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Jangan melompat a
 - `docs/DATASET_CARD.md` — kolom "Catatan eksperimen".
 - Laporan AI di `docs/ai-logs/reports/` sesuai template.
 - README — instruksi menjalankan pipeline data (hanya jika bagian terkait sudah ada).
+
+## 14. Amendemen untuk eksperimen C15 (2026-10-24)
+
+Angka pada butir 1, 15, 16, 21, dan 59 di atas adalah **keputusan baseline** (koordinator 2026-10-19, ADR-012) dan sengaja dibiarkan apa adanya sebagai catatan historis. Eksperimen C15 mengubahnya melalui ADR baru:
+
+| Butir | Baseline di issue ini | C15 | ADR |
+|---|---|---|---|
+| 1, 16, 21, 59 | subset 1.000 artikel (800 train + 200 test) | **1.800 artikel** (1.600 train + 200 test) -> 1.440 / 159 / 200 setelah dedup & split | ADR-015 |
+| 15 | `context_length=64` | **128** | ADR-015 |
+| 3 (kontrak tokenizer) | tanpa batas vocab | **`min_freq=2`** -> vocab 16.278, coverage train 98,0% | ADR-013 |
+
+Dampak pada pipeline: `scripts/download_subset.py` menerima `--train/--test`, `scripts/process_and_split.py` menerima `--train-raw/--test-raw`, dan `make_kaggle_zip.py` memverifikasi jumlah dokumen per split terhadap ADR-015. Acceptance criteria lain pada issue ini tidak berubah.

@@ -104,3 +104,16 @@ Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Jangan menggabung
 
 - Laporan AI di `docs/ai-logs/reports/` sesuai template.
 - Catatan kompleksitas, edge cases, dan hasil tes di laporan eksperimen (mengikuti template, bukan mengubah `docs/TECH_SPEC.md`/`docs/ARCHITECTURE_DECISIONS.md` tanpa proses ADR).
+
+## 14. Amendemen untuk eksperimen C15 (2026-10-24)
+
+Konfigurasi pada butir 13 di atas adalah **baseline** ADR-004 dan tetap berlaku sebagai default. Eksperimen C15 memakai konfigurasi berbeda melalui ADR baru:
+
+| Parameter | Baseline di issue ini | C15 | ADR |
+|---|---|---|---|
+| `n_layers` | 2 | **4** | ADR-014 |
+| `context_length` | 64 | **128** | ADR-015 |
+| `tie_embeddings` | tidak ada (LM head terpisah) | **True** (satu matriks `V x d` dipakai embedding dan LM head) | ADR-014 |
+| `epochs` | 10 | **20** | ADR-016 |
+
+Nilai `n_heads`, `d_model`, `d_ff`, dropout, epsilon LayerNorm, pre-LayerNorm, GELU, dan implementasi attention/PE manual tidak berubah. Signature `MiniGPT` bertambah satu parameter opsional `tie_embeddings: bool = False` sehingga pemanggil lama tidak terpengaruh.

@@ -110,3 +110,25 @@ Kerjakan **satu subtask pada satu waktu**, dari atas ke bawah. Kerangka dan mock
 - Laporan eksperimen (loss, contoh generate) di `docs/ai-logs/reports/` dan catatan hasil aktual.
 - README — instruksi menjalankan training dan generate.
 - Jangan mengubah `docs/TECH_SPEC.md`/`docs/ARCHITECTURE_DECISIONS.md` tanpa proses ADR.
+
+## 14. Amendemen untuk eksperimen C15 (2026-10-24)
+
+Angka pada butir 13, 44, dan 59 di atas adalah **baseline** (keputusan koordinator 19 Okt 2026) dan dibiarkan apa adanya sebagai catatan historis. Eksperimen C15 mengubahnya melalui ADR baru:
+
+| Parameter | Baseline di issue ini | C15 | ADR |
+|---|---|---|---|
+| `epochs` | 10 | **20** | ADR-016 |
+| `context_length` | 64 (implisit) | **128** | ADR-015 |
+| `n_layers` | 2 | **4** | ADR-014 |
+| Weight tying | tidak (LM head terpisah) | **ya** (`tie_embeddings=True`) | ADR-014 |
+| Protokol `val_loss` | loss per window stride-1 | **loss per dokumen + CI 95%**, target `<unk>` dikecualikan | ADR-013 |
+
+Yang tidak berubah: batch size 32, `lr=3e-4`, `weight_decay=0.01`, seed 42, `CrossEntropyLoss(ignore_index=pad_id)`, greedy decoding sebagai default, dan berhenti pada `<eos>` atau `max_new_tokens`.
+
+Tambahan pada C15 (tidak mengubah kontrak penerimaan issue ini):
+
+- `src/generate.py` menerima `DecodeConfig` opsional untuk `temperature`, `top_k`, `top_p`, `repetition_penalty`, `no_repeat_ngram_size`, dan `ban_unk`. `generate()` tanpa argumen tetap greedy murni sesuai ADR-009.
+- `src/postprocess.py` menyediakan detokenisasi, kapitalisasi, dan pemotongan di batas kalimat untuk teks yang ditampilkan. `Tokenizer.decode` tidak diubah.
+- Metrik kualitas generasi memakai `dup_4gram` (bukan trigram, yang dilarang `no_repeat_ngram_size=3`), `ends_at_sentence_pre_trim`, dan `verbatim_span_tokens`.
+
+Catatan metodologis: C15 mengubah tying, `min_freq`, `context_length`, dan jumlah epoch dalam satu run, sehingga kontribusi masing-masing tidak dapat dipisahkan. Atribusi per-variabel memerlukan ablation terpisah.
