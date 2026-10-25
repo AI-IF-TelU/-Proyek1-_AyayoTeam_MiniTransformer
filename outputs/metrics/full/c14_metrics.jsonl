@@ -1,0 +1,5 @@
+{"epoch": 1, "train_loss": 5.568583, "val_loss": 7.13515, "epoch_sec": 1123.65}
+{"epoch": 2, "train_loss": 4.152143, "val_loss": 7.856671, "epoch_sec": 921.85}
+{"epoch": 3, "train_loss": 3.640476, "val_loss": 8.304918, "epoch_sec": 1115.32}
+{"epoch": 4, "train_loss": 3.335589, "val_loss": 8.649888, "epoch_sec": 2120.66}
+{"event": "generation", "prompt": "presiden indonesia", "generated": "presiden indonesia , jokowi mengutus erick thohir bertemu dengan presiden jokowi . jokowi menyebut bahwa pertemuan itu tidak ada campur tangan dengan ppp . \" saya tidak ada pembicaraan formal . saya pikir itu , \" kata dia . saya , saya", "total_seconds": 5304.64, "device": "cpu", "torch_version": "2.5.1+cu121", "vocab_size": 19192, "n_train_segments": 246290, "n_val_segments": 28229, "n_params": 2556672, "history": [{"epoch": 1, "train_loss": 5.568583, "val_loss": 7.13515, "epoch_sec": 1123.65}, {"epoch": 2, "train_loss": 4.152143, "val_loss": 7.856671, "epoch_sec": 921.85}, {"epoch": 3, "train_loss": 3.640476, "val_loss": 8.304918, "epoch_sec": 1115.32}, {"epoch": 4, "train_loss": 3.335589, "val_loss": 8.649888, "epoch_sec": 2120.66}]}
