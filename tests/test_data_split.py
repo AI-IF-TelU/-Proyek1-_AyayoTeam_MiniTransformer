@@ -8,8 +8,9 @@ def test_normalize_text():
     expected = "halo dunia! ini testing."
     assert normalize_text(raw) == expected
 
-def test_splits_and_leakage():
-    stats = process_and_split()
+def test_splits_and_leakage(tmp_path):
+    # tmp_path: test must never overwrite the real data/processed split.
+    stats = process_and_split(processed_dir=tmp_path)
     
     train_len = stats["train_docs"]
     val_len = stats["val_docs"]
@@ -28,9 +29,9 @@ def test_splits_and_leakage():
                     contents.add(normalize_text(item["content"]))
         return contents
 
-    train_set = load_contents(PROCESSED_DIR / "train.jsonl")
-    val_set = load_contents(PROCESSED_DIR / "val.jsonl")
-    test_set = load_contents(PROCESSED_DIR / "test.jsonl")
+    train_set = load_contents(tmp_path / "train.jsonl")
+    val_set = load_contents(tmp_path / "val.jsonl")
+    test_set = load_contents(tmp_path / "test.jsonl")
 
     assert len(train_set) == train_len
     assert len(val_set) == val_len
