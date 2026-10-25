@@ -27,3 +27,9 @@ Thumbs.db
 
 *.jsonl
 docs/ai-logs/raw/
+
+# Build artifacts (regenerate with make_kaggle_zip.py)
+ayayo_dataset.zip
+
+# Local scratch data (regenerate with scripts/make_tiny_subset.py)
+data/processed/_tiny_*.jsonl

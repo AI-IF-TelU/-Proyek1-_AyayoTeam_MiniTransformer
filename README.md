@@ -31,6 +31,33 @@ Perbedaan konfigurasi antara baseline dan C15 dicatat di ADR-013 (batas `min_fre
 | `n_layers` | 2 | 4 | ADR-014 |
 | `epochs` | 10 | 20 | ADR-016 |
 
+### Struktur direktori
+
+```
+.
+├── data/
+│   ├── raw/                 # unduhan mentah + metadata (ADR-015)
+│   └── processed/           # train.jsonl, val.jsonl, test.jsonl
+├── docs/                    # PRD, TECH_SPEC, ADR, DATASET_CARD, laporan D*
+├── issues/                  # issue lokal + rencana kerja
+├── outputs/metrics/
+│   ├── full/                # checkpoint + metrik baseline C14 (Modal CPU)
+│   └── c15/                 # checkpoint + metrik eksperimen C15 (Kaggle)
+├── scripts/                 # unduh, split, tiny subset
+├── src/
+│   ├── data/                # tokenizer, dataset
+│   └── model/               # PE, attention, decoder block, MiniGPT
+├── tests/                   # pytest
+├── tools/                   # skrip bantu manual (generate teks)
+├── kaggle_c15.ipynb         # notebook eksperimen (satu-satunya)
+├── make_kaggle_zip.py       # bangun ayayo_dataset.zip untuk Kaggle
+├── run_training.py          # training lokal / Modal
+└── modal_app.py             # entrypoint Modal T4
+```
+
+`ayayo_dataset.zip` dan `data/processed/_tiny_*.jsonl` adalah artefak build/skratch:
+tidak di-commit, dibuat ulang lewat `make_kaggle_zip.py` dan `scripts/make_tiny_subset.py`.
+
 ## 3. Instalasi dari Awal
 
 ### Prasyarat
@@ -292,9 +319,10 @@ from src.model.minigpt import MiniGPT
 from src.data.tokenizer import Tokenizer
 from src.generate import generate
 
-# Hasil `modal volume get` ada di outputs/metrics/full/;
+# Artefak C15 dari Kaggle : outputs/metrics/c15/
+# Baseline C14 / `modal volume get` : outputs/metrics/full/
 # `python run_training.py --metrics-dir outputs/metrics` menulis ke outputs/metrics/.
-ck = load_checkpoint("outputs/metrics/minigpt_c14.pt")
+ck = load_checkpoint("outputs/metrics/full/minigpt_c14.pt")
 
 # `config["model"]` memuat kunci yang bukan parameter konstruktor MiniGPT
 # (`d_ff` diturunkan otomatis, `min_freq` milik tokenizer). Pakai from_config
@@ -310,7 +338,7 @@ print(generate(model, tok, "presiden indonesia", max_new_tokens=40))
 
 Tanpa `Tokenizer.from_vocab`, `id_to_token` dan `vocab_size` tetap kosong sehingga
 `decode`/`generate` menghasilkan string kosong tanpa error (lihat
-[`docs/D9_FAILURE_LOG.md`](docs/D9_FAILURE_LOG.md) F-D9-01).
+[`docs/reports/D9_FAILURE_LOG.md`](docs/reports/D9_FAILURE_LOG.md) F-D9-01).
 
 Generation menggunakan **greedy decoding**: berhenti saat `<eos>` dihasilkan atau saat `max_new_tokens` tercapai, dengan konteks dibatasi `context_length` terakhir (window geser).
 
@@ -341,6 +369,19 @@ Artefak run **semuanya JSONL** di `/kaggle/working/outputs/metrics/` (ADR-011):
 | `c15_kaggle_vocab.jsonl` | satu baris `{"token","id"}` per token |
 | `minigpt_c15_kaggle_best.pt` | checkpoint `val_loss` per dokumen terendah |
 | `minigpt_c15_kaggle_last.pt` | checkpoint epoch terakhir |
+
+Hasil run C15 yang sudah dijalankan disalin ke [`outputs/metrics/c15/`](outputs/metrics/c15/).
+Hasil baseline C14 ada di `outputs/metrics/full/`.
+
+Generate dari checkpoint mana pun:
+
+```powershell
+python tools/generate_text.py
+```
+
+Skrip itu memuat `outputs/metrics/c15/minigpt_c15_kaggle_best.pt`, memakai temperature hasil
+kalibrasi run (1.1), dan merapikan teks lewat `postprocess`. Ubah `CKPT` di bagian atas file
+untuk memakai checkpoint C14.
 
 Protokol pengukuran C15 (menggantikan pelaporan loss per window stride-1):
 
@@ -398,13 +439,13 @@ pytest 9.1.1, torch 2.14.1+cpu, CPU-only):
 
 - Rincian perintah, matriks kontrak→test→status (`TECH_SPEC.md` §3–§7), matriks acceptance
   criteria Issues #2–#6, hasil integrasi, riwayat debugging, dan hasil eksperimen:
-  [`docs/D12_TESTING_REPORT.md`](docs/D12_TESTING_REPORT.md).
+  [`docs/reports/D12_TESTING_REPORT.md`](docs/reports/D12_TESTING_REPORT.md).
 - **Laporan akhir berbasis bukti** (rekap acceptance criteria Issues #2–#6, ledger D1–D13, status
   temuan terbuka, audit logging Issue E) pada `master @ edbf5cc`:
-  [`docs/D13_FINAL_REPORT.md`](docs/D13_FINAL_REPORT.md).
-- Riwayat eksekusi per subtask D2–D13: [`docs/TESTING.md`](docs/TESTING.md).
-- Log kegagalan dan bukti reproduksinya: [`docs/D9_FAILURE_LOG.md`](docs/D9_FAILURE_LOG.md);
-  verifikasi perbaikan: [`docs/D10_FIX_VERIFICATION.md`](docs/D10_FIX_VERIFICATION.md).
+  [`docs/reports/D13_FINAL_REPORT.md`](docs/reports/D13_FINAL_REPORT.md).
+- Riwayat eksekusi per subtask D2–D13: [`docs/reports/TESTING.md`](docs/reports/TESTING.md).
+- Log kegagalan dan bukti reproduksinya: [`docs/reports/D9_FAILURE_LOG.md`](docs/reports/D9_FAILURE_LOG.md);
+  verifikasi perbaikan: [`docs/reports/D10_FIX_VERIFICATION.md`](docs/reports/D10_FIX_VERIFICATION.md).
 - Laporan eksperimen training 4 epoch (baseline C14): [`docs/ai-logs/reports/AI-LOG-C14-experiment.md`](docs/ai-logs/reports/AI-LOG-C14-experiment.md).
 - Notepad eksperimen aktif: [`kaggle_c15.ipynb`](kaggle_c15.ipynb); keputusan yang mengubah baseline: ADR-013 s.d. ADR-016 di [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md).
 
@@ -416,7 +457,7 @@ diperbaiki: default mengikuti `model.context_length`); signature
 `generate` berbeda dari `TECH_SPEC.md` §6 (F-D9-03, sudah diselaraskan di dokumen §6 —
 signature aktual 7 parameter kini tercatat); artefak `outputs/metrics/full/` tidak ada di
 repo sehingga contoh restore tidak dapat dijalankan langsung dari clone (F-D9-06, masih
-terbuka). Rincian dan status tiap temuan ada di `docs/D12_TESTING_REPORT.md` §6.
+terbuka). Rincian dan status tiap temuan ada di `docs/reports/D12_TESTING_REPORT.md` §6.
 
 Catatan tambahan untuk restore: gunakan `MiniGPT.from_config(ck["config"]["model"])`,
 bukan `MiniGPT(**config)`. Config C15 memuat `min_freq`, yang bukan parameter konstruktor
