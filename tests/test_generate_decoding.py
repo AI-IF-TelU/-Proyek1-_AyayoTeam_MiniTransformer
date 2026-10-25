@@ -196,3 +196,80 @@ def test_pick_sampling_temperature_falls_back_when_nothing_is_feasible():
                                            max_new_tokens=6, min_distinct1=0.99)
     assert best == 0.8
     assert all(row[2] == 0 for row in rows)
+
+
+def test_nll_and_ece_moves_batches_to_model_device():
+    """Model di device berbeda dari batch: CPU batch + model bertanda device lain.
+
+    Regresi untuk RuntimeError di Kaggle: nll_and_ece menerima tensor CPU dari
+    chunked_document_batches sementara model ada di cuda:0.
+    """
+    from src.generate import nll_and_ece
+
+    moved = []
+
+    class _RecordingModel(_FixedModel):
+        def forward(self, x):
+            moved.append(x.device.type)
+            return super().forward(x)
+
+    model = _RecordingModel(best_id=7, rival_id=8)
+    x = torch.tensor([[5, 5, 5, 5]])
+    y = torch.tensor([[7, 8, 7, 8]])
+    nll, acc, ece = nll_and_ece(model, [(x, y)], temperature=1.0)
+
+    assert moved, "forward must be called"
+    assert all(d == "cpu" for d in moved), "batch must be moved to the model device"
+    assert nll == nll and 0.0 <= acc <= 1.0 and ece == ece
+
+
+def test_nll_and_ece_returns_finite_metrics_with_partial_batch():
+    from src.generate import nll_and_ece
+
+    model = _FixedModel(best_id=7, rival_id=8)
+    x = torch.tensor([[5, 5, 5, 5]])
+    y = torch.tensor([[7, 0, 0, 0]])
+    nll, acc, ece = nll_and_ece(model, [(x, y)], temperature=0.9)
+    assert nll == nll and ece == ece
+    assert 0.0 <= acc <= 1.0
+
+
+def test_nll_and_ece_device_contract_detects_real_mismatch(monkeypatch):
+    """Tanpa perpindahan device, forward harus gagal seperti di Kaggle (cuda)."""
+    from src.generate import nll_and_ece
+
+    class _StrictModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, x):
+            if x.device != self.dummy.device:
+                raise RuntimeError(
+                    f"index is on {x.device}, weight on {self.dummy.device}"
+                )
+            logits = torch.full((x.size(0), x.size(1), VOCAB), -20.0)
+            logits[:, -1, 7] = 5.0
+            return logits
+
+    model = _StrictModel()
+    x = torch.tensor([[5, 5, 5, 5]])
+    y = torch.tensor([[7, 7, 0, 0]])
+    nll, acc, ece = nll_and_ece(model, [(x, y)])
+    assert nll == nll and 0.0 <= acc <= 1.0
+
+
+def test_nll_and_ece_on_cuda_when_available():
+    import pytest
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA tidak tersedia")
+    from src.generate import nll_and_ece
+
+    from src.model.minigpt import MiniGPT
+    model = MiniGPT(vocab_size=VOCAB, n_layers=1, n_heads=2, d_model=8,
+                    context_length=8, dropout=0.0).cuda()
+    x = torch.tensor([[5, 5, 5, 5]])
+    y = torch.tensor([[7, 7, 0, 0]])
+    nll, acc, ece = nll_and_ece(model, [(x, y)])
+    assert nll == nll and 0.0 <= acc <= 1.0
+

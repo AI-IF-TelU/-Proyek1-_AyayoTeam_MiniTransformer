@@ -141,14 +141,26 @@ def generate(model, tokenizer, prompt: str, max_new_tokens: int = 64,
 
 @torch.no_grad()
 def nll_and_ece(model, batches, temperature: float = 1.0) -> Tuple[float, float, float]:
-    """Teacher-forced NLL, accuracy and ECE (15 bins) at a given temperature."""
+    """Teacher-forced NLL, accuracy and ECE (15 bins) at a given temperature.
+
+    Batches are moved to the model's device: callers pass CPU tensors (dataset
+    loaders and `chunked_document_batches` yield CPU), while the model may live
+    on CUDA. The ECE accumulators stay on CPU, so per-batch statistics are moved
+    back before being folded in.
+    """
     model.eval()
+    try:
+        device = next(model.parameters()).device
+    except StopIteration:
+        device = torch.device("cpu")
+
     total_nll, total_tokens, correct = 0.0, 0, 0
     conf_bins = torch.zeros(15, dtype=torch.float64)
     acc_bins = torch.zeros(15, dtype=torch.float64)
     count_bins = torch.zeros(15, dtype=torch.float64)
 
     for x, y in batches:
+        x, y = x.to(device), y.to(device)
         logits = model(x).float() / max(temperature, 1e-6)
         flat = logits.reshape(-1, logits.size(-1))
         target = y.reshape(-1)
@@ -164,6 +176,7 @@ def nll_and_ece(model, batches, temperature: float = 1.0) -> Tuple[float, float,
         conf, pred = probs.max(dim=-1)
         hit = (pred == target).float()
         correct += int(hit.sum())
+        conf, hit = conf.cpu(), hit.cpu()
         idx = torch.clamp((conf * 15).long(), 0, 14)
         count_bins.index_add_(0, idx, torch.ones_like(conf, dtype=torch.float64))
         conf_bins.index_add_(0, idx, conf.double())
