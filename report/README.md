@@ -3,6 +3,11 @@
 > **Mini-GPT Bahasa Indonesia berbasis Decoder-only Transformer**  
 > Repository: [AI-IF-TelU/-Proyek1-_AyayoTeam_MiniTransformer](https://github.com/AI-IF-TelU/-Proyek1-_AyayoTeam_MiniTransformer)  
 > Tim: Ayayo Team • 4 anggota • Periode pengembangan tercatat: 14–25 Oktober 2026
+> - Rafa Suryaputra - NIM 103012580048
+> - Firdaus Akbar Amrullah - NIM 103012580011
+> - Dzaki Alwan Firjatullah - NIM 103012580006
+> - Muhammad Raihan Fahrifi - NIM 103012580017
+
 
 ## Ringkasan
 
